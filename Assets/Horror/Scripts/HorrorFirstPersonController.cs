@@ -7,7 +7,6 @@ public class HorrorFirstPersonController : MonoBehaviour
 {
     [SerializeField] Transform cameraPivot;
     [SerializeField] Camera playerCamera;
-    [SerializeField] Light flashlight;
 
     [Header("Movement")]
     [SerializeField] float walkSpeed = 2f;
@@ -52,12 +51,6 @@ public class HorrorFirstPersonController : MonoBehaviour
     [SerializeField] float idleSwaySpeed = 0.7f;
     [SerializeField] float landBob = 0.05f;
 
-    [Header("Flashlight")]
-    [SerializeField] bool flashlightStartsOn = true;
-    [SerializeField] float flashlightBaseIntensity = 220f;
-    [SerializeField] bool flashlightFlicker;
-    [SerializeField] float flickerAmount = 18f;
-
     [Header("Footsteps")]
     [SerializeField] AudioSource footstepSource;
     [SerializeField] AudioClip[] walkFootsteps;
@@ -86,7 +79,6 @@ public class HorrorFirstPersonController : MonoBehaviour
     float _stepTimer;
     float _landOffset;
     bool _wasGrounded = true;
-    bool _flashlightOn;
     int _lastFootstepIndex = -1;
     Vector3 _camPosVelocity;
     float _camRoll;
@@ -105,7 +97,6 @@ public class HorrorFirstPersonController : MonoBehaviour
             _sprintAction = _playerInput.actions.FindAction("Sprint", false);
         }
         _stamina = maxStamina;
-        _flashlightOn = flashlightStartsOn;
         _yaw = transform.eulerAngles.y;
 
         if (cameraPivot == null)
@@ -118,13 +109,9 @@ public class HorrorFirstPersonController : MonoBehaviour
         if (playerCamera == null && cameraPivot != null)
             playerCamera = cameraPivot.GetComponentInChildren<Camera>();
 
-        if (flashlight == null && cameraPivot != null)
-            flashlight = cameraPivot.GetComponentInChildren<Light>();
-
         if (footstepSource == null)
             footstepSource = GetComponent<AudioSource>();
 
-        ApplyFlashlightState();
         SetControllerHeight(standingHeight, true);
     }
 
@@ -144,7 +131,6 @@ public class HorrorFirstPersonController : MonoBehaviour
         UpdateStance(Time.deltaTime);
         UpdateMotor(Time.deltaTime);
         UpdateCameraMotion(Time.deltaTime);
-        UpdateFlashlight();
     }
 
     public void OnMove(InputValue value) => _moveInput = value.Get<Vector2>();
@@ -159,12 +145,6 @@ public class HorrorFirstPersonController : MonoBehaviour
     {
         if (value.isPressed)
             _jumpQueued = true;
-    }
-
-    public void OnFlashlight(InputValue value)
-    {
-        if (value.isPressed)
-            ToggleFlashlight();
     }
 
     void HandleCursor()
@@ -364,29 +344,6 @@ public class HorrorFirstPersonController : MonoBehaviour
         AudioClip clip = set[index];
         if (clip != null)
             footstepSource.PlayOneShot(clip, IsCrouching ? 0.45f : 1f);
-    }
-
-    void UpdateFlashlight()
-    {
-        if (flashlight == null || !_flashlightOn)
-            return;
-
-        float intensity = flashlightBaseIntensity;
-        if (flashlightFlicker)
-            intensity += (Mathf.PerlinNoise(Time.time * 9.1f, 0.37f) - 0.5f) * 2f * flickerAmount;
-        flashlight.intensity = intensity;
-    }
-
-    void ToggleFlashlight()
-    {
-        _flashlightOn = !_flashlightOn;
-        ApplyFlashlightState();
-    }
-
-    void ApplyFlashlightState()
-    {
-        if (flashlight != null)
-            flashlight.enabled = _flashlightOn;
     }
 
     bool CanStand()

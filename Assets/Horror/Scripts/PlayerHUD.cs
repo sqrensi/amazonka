@@ -42,6 +42,15 @@ public class PlayerHUD : MonoBehaviour
         if (_font == null)
             _font = Resources.GetBuiltinResource<Font>("Arial.ttf");
 
+        // Удаляем ранее существующий Canvas (напр. случайно запечённый в префаб),
+        // чтобы интерфейс не дублировался.
+        for (int i = transform.childCount - 1; i >= 0; i--)
+        {
+            Transform c = transform.GetChild(i);
+            if (c.name == "PlayerHUD_Canvas")
+                Destroy(c.gameObject);
+        }
+
         BuildUI();
     }
 

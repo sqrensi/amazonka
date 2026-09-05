@@ -13,6 +13,9 @@ GameObject:
   - component: {fileID: 1000006}
   - component: {fileID: 1000005}
   - component: {fileID: 1000004}
+  - component: {fileID: 1857851179236916339}
+  - component: {fileID: 581283701292680481}
+  - component: {fileID: 800172636330371761}
   - component: {fileID: 1000007}
   - component: {fileID: 1000008}
   - component: {fileID: 1000009}
@@ -65,94 +68,6 @@ CharacterController:
   m_SkinWidth: 0.08
   m_MinMoveDistance: 0.001
   m_Center: {x: 0, y: 0.9, z: 0}
---- !u!114 &1000004
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1000001}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1d0f4b7e26a37c9d2e5a8b1c4f7d0e35, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::HorrorFirstPersonController
-  cameraPivot: {fileID: 2000002}
-  playerCamera: {fileID: 3000003}
-  flashlight: {fileID: 4000003}
-  walkSpeed: 2
-  sprintSpeed: 5
-  crouchSpeed: 1.2
-  acceleration: 12
-  gravity: -22
-  jumpHeight: 1.05
-  lookSensitivity: 0.08
-  stickLookSensitivity: 120
-  minPitch: -82
-  maxPitch: 82
-  invertY: 0
-  standingHeight: 1.8
-  crouchHeight: 1.15
-  standingCameraHeight: 1.62
-  crouchCameraHeight: 0.92
-  stanceLerp: 12
-  maxStamina: 4.5
-  staminaDrain: 1.15
-  staminaRegen: 0.65
-  staminaRegenDelay: 0.8
-  baseFov: 65
-  sprintFov: 73
-  bobWalkAmount: 0.012
-  bobSprintAmount: 0.02
-  bobCrouchAmount: 0.008
-  bobWalkFrequency: 6.2
-  bobSprintFrequency: 8.2
-  bobHorizontalScale: 0.5
-  bobRollAmount: 0.35
-  cameraSmoothing: 12
-  idleSway: 0.006
-  idleSwaySpeed: 0.7
-  landBob: 0.05
-  flashlightStartsOn: 1
-  flashlightBaseIntensity: 220
-  flashlightFlicker: 0
-  flickerAmount: 18
-  footstepSource: {fileID: 1000006}
-  walkFootsteps: []
-  sprintFootsteps: []
-  walkStepInterval: 0.58
-  sprintStepInterval: 0.38
-  crouchStepInterval: 0.78
---- !u!114 &1000005
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1000001}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 62899f850307741f2a39c98a8b639597, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.PlayerInput
-  m_Actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
-  m_NotificationBehavior: 0
-  m_UIInputModule: {fileID: 0}
-  m_DeviceLostEvent:
-    m_PersistentCalls:
-      m_Calls: []
-  m_DeviceRegainedEvent:
-    m_PersistentCalls:
-      m_Calls: []
-  m_ControlsChangedEvent:
-    m_PersistentCalls:
-      m_Calls: []
-  m_ActionEvents: []
-  m_NeverAutoSwitchControlSchemes: 0
-  m_DefaultControlScheme: 
-  m_DefaultActionMap: Player
-  m_SplitScreenIndex: -1
-  m_Camera: {fileID: 3000003}
 --- !u!82 &1000006
 AudioSource:
   m_ObjectHideFlags: 0
@@ -177,7 +92,7 @@ AudioSource:
   MinDistance: 1
   MaxDistance: 18
   Pan2D: 0
-  rolloffMode: 1
+  rolloffMode: 0
   BypassEffects: 0
   BypassListenerEffects: 0
   BypassReverbZones: 0
@@ -250,6 +165,218 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &1000005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 62899f850307741f2a39c98a8b639597, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.PlayerInput
+  m_Actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+  m_NotificationBehavior: 0
+  m_UIInputModule: {fileID: 0}
+  m_DeviceLostEvent:
+    m_PersistentCalls:
+      m_Calls: []
+  m_DeviceRegainedEvent:
+    m_PersistentCalls:
+      m_Calls: []
+  m_ControlsChangedEvent:
+    m_PersistentCalls:
+      m_Calls: []
+  m_ActionEvents: []
+  m_NeverAutoSwitchControlSchemes: 0
+  m_DefaultControlScheme: 
+  m_DefaultActionMap: Player
+  m_SplitScreenIndex: -1
+  m_Camera: {fileID: 3000003}
+--- !u!114 &1000004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1d0f4b7e26a37c9d2e5a8b1c4f7d0e35, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HorrorFirstPersonController
+  cameraPivot: {fileID: 2000002}
+  playerCamera: {fileID: 3000003}
+  walkSpeed: 2
+  sprintSpeed: 5
+  crouchSpeed: 1.2
+  acceleration: 12
+  gravity: -22
+  jumpHeight: 1.05
+  lookSensitivity: 0.08
+  stickLookSensitivity: 120
+  minPitch: -82
+  maxPitch: 82
+  invertY: 0
+  standingHeight: 1.8
+  crouchHeight: 1.15
+  standingCameraHeight: 1.62
+  crouchCameraHeight: 0.92
+  stanceLerp: 12
+  maxStamina: 4.5
+  staminaDrain: 1.15
+  staminaRegen: 0.65
+  staminaRegenDelay: 0.8
+  baseFov: 65
+  sprintFov: 73
+  bobWalkAmount: 0.012
+  bobSprintAmount: 0.02
+  bobCrouchAmount: 0.008
+  bobWalkFrequency: 6.2
+  bobSprintFrequency: 8.2
+  bobHorizontalScale: 0.5
+  bobRollAmount: 0.35
+  cameraSmoothing: 12
+  idleSway: 0.006
+  idleSwaySpeed: 0.7
+  landBob: 0.05
+  footstepSource: {fileID: 1000006}
+  walkFootsteps: []
+  sprintFootsteps: []
+  walkStepInterval: 0.58
+  sprintStepInterval: 0.38
+  crouchStepInterval: 0.78
+--- !u!114 &1857851179236916339
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec85742e5590df5409ce6e6f96efbd88, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerInventory
+  heldSocket: {fileID: 5511163734435138859}
+  playerCamera: {fileID: 3000003}
+  slotCount: 5
+  autoEquipOnPickup: 1
+  obstructionStartDistance: 0.9
+  obstructionFullDistance: 0.35
+  obstructionProbeRadius: 0.15
+  obstructionMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+--- !u!114 &581283701292680481
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5266c58da0ba6449b470fde00832bc0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerInteractor
+  pickupRadius: 2.2
+  mask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+--- !u!114 &800172636330371761
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 38e5607048f92d74db1e39fe623c8718, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InteractionHUD
+  interactor: {fileID: 581283701292680481}
+  inventory: {fileID: 1857851179236916339}
+  playerCamera: {fileID: 3000003}
+  controller: {fileID: 1000004}
+  interactKey: F
+--- !u!114 &1000007
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4d5e60718293a4b506c7d8e9f0a1b23, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerHealth
+  maxHealth: 100
+  currentHealth: 100
+  invulnerabilityTime: 0.4
+  disableOnDeath:
+  - {fileID: 1000004}
+  - {fileID: 1000005}
+  freeCursorOnDeath: 1
+--- !u!114 &1000008
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e3c4d5f60718293a405b6c7d8e9f0a12, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerNoise
+  controller: {fileID: 1000004}
+  walkStepNoise: 5
+  sprintStepNoise: 7
+  crouchStepNoise: 1
+  walkStepInterval: 0.45
+  sprintStepInterval: 0.3
+  crouchStepInterval: 0.7
+  landNoise: 8
+  minMoveSpeed: 0.4
+--- !u!114 &1000009
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b4c5d6e7f8091a2b3c4d5e6f7081920, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerHUD
+  health: {fileID: 1000007}
+  noise: {fileID: 1000008}
+  controller: {fileID: 1000004}
+  healthColor: {r: 0.75, g: 0.12, b: 0.12, a: 1}
+  staminaColor: {r: 0.25, g: 0.7, b: 0.85, a: 1}
+  noiseLowColor: {r: 0.9, g: 0.85, b: 0.2, a: 1}
+  noiseHighColor: {r: 0.9, g: 0.15, b: 0.1, a: 1}
+--- !u!114 &1000010
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6a3b4c5d6e7f8091a2b3c4d5e6f70819, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerRespawn
+  spawnPoint: {fileID: 0}
+  respawnDelay: 2.5
+  resetNoiseOnRespawn: 1
 --- !u!1 &2000001
 GameObject:
   m_ObjectHideFlags: 0
@@ -314,7 +441,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 4000002}
+  - {fileID: 5511163734435138859}
   m_Father: {fileID: 2000002}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!20 &3000003
@@ -327,7 +454,7 @@ Camera:
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 1
-  m_BackGroundColor: {r: 0.05, g: 0.05, b: 0.06, a: 0}
+  m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -420,7 +547,7 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
---- !u!1 &4000001
+--- !u!1 &8247784301206845501
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -428,196 +555,26 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 4000002}
-  - component: {fileID: 4000003}
-  - component: {fileID: 4000004}
+  - component: {fileID: 5511163734435138859}
   m_Layer: 0
-  m_Name: Flashlight
+  m_Name: HeldSocket
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &4000002
+--- !u!4 &5511163734435138859
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4000001}
+  m_GameObject: {fileID: 8247784301206845501}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.0348995, y: -0.0174524, z: 0.0006095, w: 0.9992386}
-  m_LocalPosition: {x: 0.12, y: -0.08, z: 0.08}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.22, y: -0.2, z: 0.45}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 3000002}
-  m_LocalEulerAnglesHint: {x: 4, y: -2, z: 0}
---- !u!108 &4000003
-Light:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4000001}
-  m_Enabled: 1
-  serializedVersion: 12
-  m_Type: 0
-  m_Color: {r: 1, g: 0.93, b: 0.78, a: 1}
-  m_Intensity: 220
-  m_Range: 16
-  m_SpotAngle: 58
-  m_InnerSpotAngle: 28
-  m_CookieSize2D: {x: 10, y: 10}
-  m_Shadows:
-    m_Type: 2
-    m_Resolution: -1
-    m_CustomResolution: -1
-    m_Strength: 0.85
-    m_Bias: 0.05
-    m_NormalBias: 0.4
-    m_NearPlane: 0.2
-    m_CullingMatrixOverride:
-      e00: 1
-      e01: 0
-      e02: 0
-      e03: 0
-      e10: 0
-      e11: 1
-      e12: 0
-      e13: 0
-      e20: 0
-      e21: 0
-      e22: 1
-      e23: 0
-      e30: 0
-      e31: 0
-      e32: 0
-      e33: 1
-    m_UseCullingMatrixOverride: 0
-  m_Cookie: {fileID: 0}
-  m_DrawHalo: 0
-  m_Flare: {fileID: 0}
-  m_RenderMode: 0
-  m_CullingMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_RenderingLayerMask: 1
-  m_Lightmapping: 4
-  m_LightShadowCasterMode: 0
-  m_AreaSize: {x: 1, y: 1}
-  m_BounceIntensity: 0
-  m_ColorTemperature: 4200
-  m_UseColorTemperature: 0
-  m_BoundingSphereOverride: {x: 0, y: 0, z: 0, w: 0}
-  m_UseBoundingSphereOverride: 0
-  m_UseViewFrustumForShadowCasterCull: 1
-  m_ForceVisible: 0
-  m_ShadowRadius: 0
-  m_ShadowAngle: 0
-  m_LightUnit: 1
-  m_LuxAtDistance: 1
-  m_EnableSpotReflector: 1
---- !u!114 &4000004
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4000001}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_UsePipelineSettings: 1
-  m_AdditionalLightsShadowResolutionTier: 2
-  m_CustomShadowLayers: 0
-  m_LightCookieSize: {x: 1, y: 1}
-  m_LightCookieOffset: {x: 0, y: 0}
-  m_SoftShadowQuality: 1
-  m_RenderingLayersMask:
-    serializedVersion: 0
-    m_Bits: 1
-  m_ShadowRenderingLayersMask:
-    serializedVersion: 0
-    m_Bits: 1
-  m_Version: 4
-  m_LightLayerMask: 1
-  m_ShadowLayerMask: 1
-  m_RenderingLayers: 1
-  m_ShadowRenderingLayers: 1
---- !u!114 &1000007
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1000001}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f4d5e60718293a4b506c7d8e9f0a1b23, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerHealth
-  maxHealth: 100
-  currentHealth: 100
-  invulnerabilityTime: 0.4
-  disableOnDeath:
-  - {fileID: 1000004}
-  - {fileID: 1000005}
-  freeCursorOnDeath: 1
---- !u!114 &1000008
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1000001}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e3c4d5f60718293a405b6c7d8e9f0a12, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerNoise
-  controller: {fileID: 1000004}
-  walkStepNoise: 5
-  sprintStepNoise: 7
-  crouchStepNoise: 1
-  walkStepInterval: 0.45
-  sprintStepInterval: 0.3
-  crouchStepInterval: 0.7
-  landNoise: 8
-  minMoveSpeed: 0.4
---- !u!114 &1000009
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1000001}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7b4c5d6e7f8091a2b3c4d5e6f7081920, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerHUD
-  health: {fileID: 1000007}
-  noise: {fileID: 1000008}
-  controller: {fileID: 1000004}
-  healthColor: {r: 0.75, g: 0.12, b: 0.12, a: 1}
-  staminaColor: {r: 0.25, g: 0.7, b: 0.85, a: 1}
-  noiseLowColor: {r: 0.9, g: 0.85, b: 0.2, a: 1}
-  noiseHighColor: {r: 0.9, g: 0.15, b: 0.1, a: 1}
---- !u!114 &1000010
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1000001}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6a3b4c5d6e7f8091a2b3c4d5e6f70819, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerRespawn
-  spawnPoint: {fileID: 0}
-  respawnDelay: 2.5
-  resetNoiseOnRespawn: 1
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}

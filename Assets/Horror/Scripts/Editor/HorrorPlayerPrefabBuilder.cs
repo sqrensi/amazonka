@@ -22,14 +22,30 @@ static class HorrorPlayerPrefabBuilder
 
     static void TryCreateIfMissing()
     {
+        // В Play-режиме не трогаем: там Awake у HUD успевает создать Canvas на temp-объекте,
+        // и он бы запёкся в префаб (причина дублирования интерфейса).
+        if (EditorApplication.isPlayingOrWillChangePlaymode || Application.isPlaying)
+            return;
+
         if (EditorApplication.isCompiling || EditorApplication.isUpdating)
         {
             EditorApplication.delayCall += TryCreateIfMissing;
             return;
         }
 
-        if (AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath) == null)
-            BuildPrefab(false);
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
+        // Нет префаба или он устаревший (без инвентаря, или ещё со старым числом слотов < 5)
+        // -> пересобрать под актуальную систему предметов/инвентаря.
+        bool outdated = prefab == null;
+        if (!outdated)
+        {
+            var inv = prefab.GetComponent<PlayerInventory>();
+            // Устарел, если нет инвентаря, слотов < 5, или в префаб случайно запёкся Canvas.
+            outdated = inv == null || inv.SlotCount < 5 ||
+                       prefab.GetComponentInChildren<Canvas>(true) != null;
+        }
+        if (outdated)
+            BuildPrefab(prefab != null);
     }
 
     static void BuildPrefab(bool force)
@@ -76,20 +92,12 @@ static class HorrorPlayerPrefabBuilder
         urpCamera.renderPostProcessing = true;
         urpCamera.antialiasing = AntialiasingMode.FastApproximateAntialiasing;
 
-        var flashlightObject = new GameObject("Flashlight");
-        flashlightObject.transform.SetParent(cameraObject.transform, false);
-        flashlightObject.transform.localPosition = new Vector3(0.12f, -0.08f, 0.08f);
-        flashlightObject.transform.localRotation = Quaternion.Euler(4f, -2f, 0f);
-
-        var light = flashlightObject.AddComponent<Light>();
-        light.type = LightType.Spot;
-        light.range = 16f;
-        light.spotAngle = 58f;
-        light.innerSpotAngle = 28f;
-        light.color = new Color(1f, 0.93f, 0.78f);
-        light.intensity = 220f;
-        light.shadows = LightShadows.Soft;
-        flashlightObject.AddComponent<UniversalAdditionalLightData>();
+        // Сокет "руки": сюда экипируемые предметы (фонарь/пистолет) подвешиваются
+        // перед камерой. Фонарь больше НЕ висит на камере — он теперь предмет в руке.
+        var heldSocket = new GameObject("HeldSocket");
+        heldSocket.transform.SetParent(cameraObject.transform, false);
+        heldSocket.transform.localPosition = new Vector3(0.22f, -0.2f, 0.45f);
+        heldSocket.transform.localRotation = Quaternion.identity;
 
         var playerInput = root.AddComponent<PlayerInput>();
         playerInput.notificationBehavior = PlayerNotifications.SendMessages;
@@ -104,9 +112,28 @@ static class HorrorPlayerPrefabBuilder
         var serialized = new SerializedObject(horror);
         serialized.FindProperty("cameraPivot").objectReferenceValue = pivot.transform;
         serialized.FindProperty("playerCamera").objectReferenceValue = cam;
-        serialized.FindProperty("flashlight").objectReferenceValue = light;
         serialized.FindProperty("footstepSource").objectReferenceValue = audio;
         serialized.ApplyModifiedPropertiesWithoutUndo();
+
+        // Инвентарь (5 слотов, клавиши 1..5). Предметы вешаются в HeldSocket.
+        var inventory = root.AddComponent<PlayerInventory>();
+        var invSo = new SerializedObject(inventory);
+        invSo.FindProperty("heldSocket").objectReferenceValue = heldSocket.transform;
+        invSo.FindProperty("playerCamera").objectReferenceValue = cam;
+        invSo.FindProperty("slotCount").intValue = 5;
+        invSo.ApplyModifiedPropertiesWithoutUndo();
+
+        // Взаимодействие по близости (подбор предметов на F, когда игрок рядом).
+        var interactor = root.AddComponent<PlayerInteractor>();
+
+        // HUD: подсказка подбора, прицел и инвентарь (Tab).
+        var interactionHud = root.AddComponent<InteractionHUD>();
+        var iHudSo = new SerializedObject(interactionHud);
+        iHudSo.FindProperty("interactor").objectReferenceValue = interactor;
+        iHudSo.FindProperty("inventory").objectReferenceValue = inventory;
+        iHudSo.FindProperty("playerCamera").objectReferenceValue = cam;
+        iHudSo.FindProperty("controller").objectReferenceValue = horror;
+        iHudSo.ApplyModifiedPropertiesWithoutUndo();
 
         // Здоровье игрока: при смерти отключаем управление и ввод.
         var playerHealth = root.AddComponent<PlayerHealth>();
@@ -133,6 +160,12 @@ static class HorrorPlayerPrefabBuilder
 
         // Возрождение после смерти.
         root.AddComponent<PlayerRespawn>();
+
+        // Защита: если по какой-то причине Awake HUD успел создать Canvas (напр. в Play-режиме),
+        // вырезаем их — HUD строится в рантайме сам, в префабе Canvas быть не должно.
+        foreach (var canvas in root.GetComponentsInChildren<Canvas>(true))
+            if (canvas != null)
+                Object.DestroyImmediate(canvas.gameObject);
 
         if (!AssetDatabase.IsValidFolder("Assets/Horror"))
             AssetDatabase.CreateFolder("Assets", "Horror");
