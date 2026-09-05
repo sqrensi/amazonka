@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 304df22a013d88b4aa43e16c9d3820c1
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: 60072b568d64c40a485e0fc55012dc9f, type: 3}
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283315
+  packageName: The Aftermath Environment (Medieval, Village)
+  packageVersion: 1.0
+  assetPath: Assets/LeartesStudios/TheAftermath/HDRP/Art/ShaderGraphs/SubG_Flatten
+    Normal.shadersubgraph
+  uploadId: 670103

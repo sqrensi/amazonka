@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 953288f9e5635754892d134965695862
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: 625f186215c104763be7675aa2d941aa, type: 3}
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283315
+  packageName: The Aftermath Environment (Medieval, Village)
+  packageVersion: 1.0
+  assetPath: Assets/LeartesStudios/TheAftermath/HDRP/Art/ShaderGraphs/S_CheapFog.shadergraph
+  uploadId: 670103
