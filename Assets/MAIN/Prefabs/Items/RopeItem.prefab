@@ -100,8 +100,8 @@ GameObject:
   m_Component:
   - component: {fileID: 4927966793576738382}
   - component: {fileID: 3165327726080580867}
-  - component: {fileID: 3020746769648852981}
-  - component: {fileID: 2296760851798649115}
+  - component: {fileID: 5634319220554758492}
+  - component: {fileID: 7928466108355235924}
   m_Layer: 0
   m_Name: RopeItem
   m_TagString: Untagged
@@ -143,11 +143,11 @@ MonoBehaviour:
   heldLocalPosition: {x: 0, y: 0, z: 0}
   heldLocalEuler: {x: 0, y: 0, z: 0}
   heldLocalScale: {x: 1, y: 1, z: 1}
-  retractedPositionOffset: {x: 0, y: 0.06, z: -0.28}
-  retractedEulerOffset: {x: -25, y: 0, z: 0}
-  retractSmoothTime: 0.12
-  useBlockThreshold: 0.5
---- !u!65 &3020746769648852981
+  retractedPositionOffset: {x: 0.015, y: -0.035, z: -0.2}
+  retractedEulerOffset: {x: -10, y: 6, z: -8}
+  retractSmoothTime: 0.42
+  useBlockThreshold: 0.82
+--- !u!65 &5634319220554758492
 BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -168,7 +168,7 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.12, y: 0.24, z: 0.12}
   m_Center: {x: 0.0000000037252903, y: 0, z: -0.000000007450581}
---- !u!54 &2296760851798649115
+--- !u!54 &7928466108355235924
 Rigidbody:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

@@ -8,8 +8,8 @@ using UnityEngine.InputSystem;
 /// экипированный — активен и "висит" перед камерой, остальные скрыты.
 ///
 /// Также следит за препятствием перед камерой: если игрок прижался к стене,
-/// предмет в руке прячется (чтобы не проходил сквозь стену), а использование
-/// (стрельба/свет) блокируется.
+/// предмет в руке плавно подтягивается к камере (без скрытия), а использование
+/// (стрельба) блокируется только вплотную.
 ///
 /// Ввод (PlayerInput, SendMessages):
 ///  - OnSlot1..OnSlot5 — выбрать слот (повторное нажатие текущего = убрать в пустые руки);
@@ -35,9 +35,9 @@ public class PlayerInventory : MonoBehaviour
 
     [Header("Obstruction (близость к стене-коллайдеру)")]
     [Tooltip("Дистанция, с которой предмет начинает плавно убираться (нет касания = достаётся).")]
-    [SerializeField] float obstructionStartDistance = 0.9f;
-    [Tooltip("Дистанция, на которой предмет полностью убран.")]
-    [SerializeField] float obstructionFullDistance = 0.35f;
+    [SerializeField] float obstructionStartDistance = 1.05f;
+    [Tooltip("Дистанция, на которой предмет максимально подтянут к камере.")]
+    [SerializeField] float obstructionFullDistance = 0.22f;
     [Tooltip("Радиус сферы проверки (объёмнее тонкого луча — надёжнее ловит коллайдеры/стены).")]
     [SerializeField] float obstructionProbeRadius = 0.15f;
     [Tooltip("Слои коллайдеров, от которых убирается предмет. Триггеры игнорируются.")]
@@ -46,6 +46,7 @@ public class PlayerInventory : MonoBehaviour
     HeldItem[] _slots;
     int _equipped = -1;
     float _obstructionAmount;
+    float _obstructionVel;
     readonly RaycastHit[] _obstructionHits = new RaycastHit[16];
     readonly Collider[] _obstructionOverlaps = new Collider[16];
 
@@ -374,9 +375,8 @@ public class PlayerInventory : MonoBehaviour
             }
         }
 
-        _obstructionAmount = target;
-        // Плавно (SmoothDamp) двигаем предмет к целевой убранности.
-        item.SetRetractTarget(target);
+        _obstructionAmount = Mathf.SmoothDamp(_obstructionAmount, target, ref _obstructionVel, 0.2f, 2.4f, Time.deltaTime);
+        item.SetRetractTarget(_obstructionAmount);
         item.TickRetract(Time.deltaTime);
     }
 

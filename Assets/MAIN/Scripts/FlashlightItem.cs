@@ -67,8 +67,7 @@ public class FlashlightItem : HeldItem
             return;
 
         bool inHand = IsEquipped;
-        float retract = inHand ? RetractAmount : 0f;
-        bool lit = _on && (!inHand || retract < 0.95f);
+        bool lit = _on;
         spot.enabled = lit;
         if (!lit)
             return;
@@ -76,6 +75,7 @@ public class FlashlightItem : HeldItem
         float intensity = baseIntensity;
         if (flicker)
             intensity += (Mathf.PerlinNoise(Time.time * 9.1f, 0.37f) - 0.5f) * 2f * flickerAmount;
-        spot.intensity = intensity * (1f - retract);
+        float close = inHand ? RetractAmount : 0f;
+        spot.intensity = intensity * Mathf.Lerp(1f, 0.62f, close);
     }
 }

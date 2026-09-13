@@ -195,17 +195,46 @@ public class BoatPiece : MonoBehaviour, IInteractable
         if (!BoatWater.TryHeight(transform.position, out float waterY))
             return;
 
-        Bounds b = _box != null ? _box.bounds : new Bounds(transform.position, pieceSize);
-        float sub = waterY - b.min.y;
-        if (sub <= 0f)
+        Vector3 size = _box != null ? _box.size : pieceSize;
+        Vector3 colCenter = _box != null ? _box.center : _colCenter;
+        float hx = Mathf.Max(0.04f, size.x * 0.45f);
+        float hy = Mathf.Max(0.03f, size.y * 0.5f);
+        float hz = Mathf.Max(0.04f, size.z * 0.45f);
+        float[] xs = { -hx, hx };
+        float[] zs = { -hz, hz };
+        float buoyancy = BoatVisuals.Buoyancy(kind);
+        float submerged = 0f;
+        int wet = 0;
+        const int sampleCount = 4;
+        for (int ix = 0; ix < xs.Length; ix++)
+        {
+            for (int iz = 0; iz < zs.Length; iz++)
+            {
+                Vector3 local = colCenter + new Vector3(xs[ix], 0f, zs[iz]);
+                Vector3 world = transform.TransformPoint(local);
+                float depth = waterY - (world.y - hy);
+                if (depth <= 0f)
+                    continue;
+                float d = Mathf.Clamp01(depth / Mathf.Max(0.08f, size.y));
+                submerged += d;
+                wet++;
+                Vector3 force = Vector3.up * (_rb.mass * buoyancy * d / sampleCount);
+                _rb.AddForceAtPosition(force, world, ForceMode.Force);
+            }
+        }
+        if (wet <= 0)
             return;
-        float depth = Mathf.Clamp(sub / Mathf.Max(0.05f, b.size.y), 0f, 1.4f);
-        float force = BoatVisuals.Buoyancy(kind) * depth;
-        _rb.AddForce(Vector3.up * force, ForceMode.Acceleration);
-        _rb.AddForce(-_rb.linearVelocity * (1.8f * depth), ForceMode.Acceleration);
-        Vector3 av = _rb.angularVelocity;
-        av *= 1f - 0.35f * depth * Time.fixedDeltaTime * 8f;
-        _rb.angularVelocity = av;
+        float frac = submerged / sampleCount;
+        if (frac <= 0.001f)
+            return;
+
+        Vector3 vel = _rb.linearVelocity;
+        _rb.AddForce(-vel * (2.8f * frac * _rb.mass), ForceMode.Force);
+        _rb.AddTorque(-_rb.angularVelocity * (1.6f * frac), ForceMode.Acceleration);
+        Vector3 straighten = Vector3.Cross(transform.up, Vector3.up);
+        _rb.AddTorque(straighten * (8f * frac), ForceMode.Acceleration);
+        if (vel.y > 1.6f)
+            _rb.AddForce(Vector3.down * ((vel.y - 1.6f) * _rb.mass * 4f), ForceMode.Force);
     }
 
     public void RegisterNail(BoatNail nail)
@@ -224,8 +253,7 @@ public class BoatPiece : MonoBehaviour, IInteractable
     {
         if (_rb != null)
         {
-            _rb.linearVelocity = Vector3.zero;
-            _rb.angularVelocity = Vector3.zero;
+            BoatBuildUtil.StopMotion(_rb);
             _rb.isKinematic = true;
             _rb.detectCollisions = false;
         }
@@ -254,10 +282,9 @@ public class BoatPiece : MonoBehaviour, IInteractable
         ApplyPhysics();
         if (!physicsLive && _rb != null)
         {
+            BoatBuildUtil.StopMotion(_rb);
             _rb.isKinematic = true;
             _rb.detectCollisions = false;
-            _rb.linearVelocity = Vector3.zero;
-            _rb.angularVelocity = Vector3.zero;
         }
         var nails = GetComponentsInChildren<BoatNail>(true);
         for (int i = 0; i < nails.Length; i++)
@@ -280,10 +307,9 @@ public class BoatPiece : MonoBehaviour, IInteractable
         _rb.isKinematic = false;
         _rb.detectCollisions = true;
         _rb.useGravity = true;
-        _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+        _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
         _rb.maxDepenetrationVelocity = IsLockedInBoat() ? 1.2f : 6f;
-        _rb.linearVelocity = velocity;
-        _rb.angularVelocity = Vector3.zero;
+        BoatBuildUtil.SetMotion(_rb, velocity, Vector3.zero);
     }
 
     void DetachLooseNails()
@@ -454,10 +480,7 @@ public class BoatPiece : MonoBehaviour, IInteractable
         }
 
         if (_rb != null)
-        {
-            _rb.linearVelocity = locked ? vel : vel * 0.85f;
-            _rb.angularVelocity = Vector3.zero;
-        }
+            BoatBuildUtil.SetMotion(_rb, locked ? vel : vel * 0.85f, Vector3.zero);
 
         Physics.SyncTransforms();
         var other = SpawnTwin(offWorld, rot, offSize);
@@ -468,8 +491,7 @@ public class BoatPiece : MonoBehaviour, IInteractable
         if (other.Body != null)
         {
             other.Body.maxDepenetrationVelocity = 0.4f;
-            other.Body.linearVelocity = vel * 0.25f + along * away * 0.45f;
-            other.Body.angularVelocity = Vector3.zero;
+            BoatBuildUtil.SetMotion(other.Body, vel * 0.25f + along * away * 0.45f, Vector3.zero);
         }
 
         IgnoreCollidersBrief(_box, other._box, 0.55f);
@@ -650,7 +672,7 @@ public class BoatPiece : MonoBehaviour, IInteractable
         _rb.mass = Mathf.Max(0.4f, BoatVisuals.Mass(kind) * (pieceSize.x * pieceSize.y * pieceSize.z) /
             (BoatVisuals.DefaultSize(kind).x * BoatVisuals.DefaultSize(kind).y * BoatVisuals.DefaultSize(kind).z));
         _rb.interpolation = RigidbodyInterpolation.Interpolate;
-        _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+        _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
         _rb.linearDamping = 0.45f;
         _rb.angularDamping = 0.7f;
         _rb.maxDepenetrationVelocity = 6f;

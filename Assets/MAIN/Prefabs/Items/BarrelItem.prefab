@@ -101,7 +101,7 @@ GameObject:
   - component: {fileID: 7637773179284927620}
   - component: {fileID: 6727386674444342473}
   - component: {fileID: 5937788402023865447}
-  - component: {fileID: 4768074027435365589}
+  - component: {fileID: 4811704418596925553}
   m_Layer: 0
   m_Name: BarrelItem
   m_TagString: Untagged
@@ -143,10 +143,10 @@ MonoBehaviour:
   heldLocalPosition: {x: 0, y: 0, z: 0}
   heldLocalEuler: {x: 0, y: 0, z: 0}
   heldLocalScale: {x: 1, y: 1, z: 1}
-  retractedPositionOffset: {x: 0, y: 0.06, z: -0.28}
-  retractedEulerOffset: {x: -25, y: 0, z: 0}
-  retractSmoothTime: 0.12
-  useBlockThreshold: 0.5
+  retractedPositionOffset: {x: 0.015, y: -0.035, z: -0.2}
+  retractedEulerOffset: {x: -10, y: 6, z: -8}
+  retractSmoothTime: 0.42
+  useBlockThreshold: 0.82
   kind: 2
 --- !u!65 &5937788402023865447
 BoxCollider:
@@ -169,7 +169,7 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.5, y: 0.62, z: 0.5}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!54 &4768074027435365589
+--- !u!54 &4811704418596925553
 Rigidbody:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

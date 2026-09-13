@@ -22,14 +22,14 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
     [SerializeField] Vector3 heldLocalScale = Vector3.one;
 
     [Header("Убирание у стены (retract)")]
-    [Tooltip("Смещение позиции в полностью убранном состоянии (тянем назад/вниз к камере).")]
-    [SerializeField] Vector3 retractedPositionOffset = new Vector3(0f, 0.06f, -0.28f);
-    [Tooltip("Довороты в полностью убранном состоянии (градусы).")]
-    [SerializeField] Vector3 retractedEulerOffset = new Vector3(-25f, 0f, 0f);
-    [Tooltip("Время сглаживания убирания/доставания (сек). Больше — мягче/медленнее.")]
-    [SerializeField] float retractSmoothTime = 0.12f;
+    [Tooltip("Смещение к камере вплотную к стене (предмет остаётся видимым).")]
+    [SerializeField] Vector3 retractedPositionOffset = new Vector3(0.015f, -0.035f, -0.2f);
+    [Tooltip("Небольшой доворот, чтобы ствол/корпус не лезли в стену.")]
+    [SerializeField] Vector3 retractedEulerOffset = new Vector3(-10f, 6f, -8f);
+    [Tooltip("Время сглаживания убирания/доставания (сек). Больше — мягче.")]
+    [SerializeField] float retractSmoothTime = 0.42f;
     [Tooltip("Порог убранности, при котором использование блокируется (0..1).")]
-    [SerializeField, Range(0f, 1f)] float useBlockThreshold = 0.5f;
+    [SerializeField, Range(0f, 1f)] float useBlockThreshold = 0.82f;
 
     protected PlayerInventory Inventory { get; private set; }
     protected GameObject Owner { get; private set; }
@@ -124,9 +124,10 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
     {
         float hide = 1f - _equip;
         Vector3 equipOffset = new Vector3(0.02f, -0.07f, -0.05f) * hide;
-        Vector3 retract = retractedPositionOffset * _retract;
+        float tuck = _retract * _retract * (3f - 2f * _retract);
+        Vector3 retract = retractedPositionOffset * tuck;
         transform.localPosition = heldLocalPosition + retract + _swayPos + _kickPos + equipOffset;
-        transform.localRotation = Quaternion.Euler(heldLocalEuler + retractedEulerOffset * _retract + _swayEuler + _kickEuler
+        transform.localRotation = Quaternion.Euler(heldLocalEuler + retractedEulerOffset * tuck + _swayEuler + _kickEuler
             + new Vector3(12f, -4f, 0f) * hide);
         transform.localScale = heldLocalScale;
     }
@@ -260,10 +261,8 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
 
     public void TickRetract(float dt)
     {
-        _retract = Mathf.SmoothDamp(_retract, _retractTarget, ref _retractVel, retractSmoothTime, Mathf.Infinity, dt);
+        _retract = Mathf.SmoothDamp(_retract, _retractTarget, ref _retractVel, retractSmoothTime, 1.35f, dt);
         _retract = Mathf.Clamp01(_retract);
-
-        SetRenderersHidden(_retract >= 0.995f);
 
         TickSway(dt);
         ApplyHeldPose();
@@ -379,12 +378,16 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
         if (_rb != null)
         {
             _rb.detectCollisions = on;
-            _rb.isKinematic = !on;
-            _rb.useGravity = on;
-            if (!on)
+            if (on)
             {
-                _rb.linearVelocity = Vector3.zero;
-                _rb.angularVelocity = Vector3.zero;
+                _rb.isKinematic = false;
+                _rb.useGravity = true;
+            }
+            else
+            {
+                BoatBuildUtil.StopMotion(_rb);
+                _rb.useGravity = false;
+                _rb.isKinematic = true;
             }
         }
     }
@@ -522,7 +525,7 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
         if (lift <= 0f)
             return;
         transform.position += Vector3.up * lift;
-        if (_rb != null && _rb.linearVelocity.y < 0f)
+        if (_rb != null && !_rb.isKinematic && _rb.linearVelocity.y < 0f)
         {
             Vector3 v = _rb.linearVelocity;
             v.y = 0f;
@@ -550,11 +553,7 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
         SetPhysicsEnabled(true);
         Physics.SyncTransforms();
         KeepAboveGround();
-        if (_rb != null)
-        {
-            _rb.linearVelocity = Vector3.zero;
-            _rb.angularVelocity = Vector3.zero;
-        }
+        BoatBuildUtil.StopMotion(_rb);
         if (ignoreWith != null)
         {
             StopIgnoreRoutine();

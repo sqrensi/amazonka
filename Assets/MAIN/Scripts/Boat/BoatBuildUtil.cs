@@ -18,7 +18,7 @@ public static class BoatBuildUtil
         if (cam == null)
             return false;
         Ray ray = new Ray(cam.transform.position, cam.transform.forward);
-        var hits = Physics.RaycastAll(ray, dist, ~0, QueryTriggerInteraction.Ignore);
+        var hits = Physics.RaycastAll(ray, dist, ~0, QueryTriggerInteraction.Collide);
         float bestAny = float.PositiveInfinity;
         float bestPiece = float.PositiveInfinity;
         RaycastHit anyHit = default;
@@ -38,7 +38,8 @@ public static class BoatBuildUtil
                 (t.name == "Vis" && t.parent != null && t.parent.name == "Ghost"))
                 continue;
             if (hits[i].collider != null && hits[i].collider.isTrigger &&
-                hits[i].collider.GetComponentInParent<BoatNail>() == null)
+                hits[i].collider.GetComponentInParent<BoatNail>() == null &&
+                hits[i].collider.GetComponentInParent<BoatWater>() == null)
                 continue;
             if (hits[i].distance < bestAny)
             {
@@ -169,13 +170,32 @@ public static class BoatBuildUtil
     public static bool TryPlacePose(GameObject owner, float dist, Vector3 size, Quaternion rot, out Vector3 pos)
     {
         pos = default;
-        if (!Aim(owner, dist, out RaycastHit hit, preferPieces: false, allowPieceSteal: false))
+        Camera cam = Cam(owner);
+        if (cam == null)
             return false;
-        BoatMaterialItem.PromoteAround(hit.point, Mathf.Max(0.6f, Mathf.Max(size.x, size.z) * 0.35f));
+        Ray ray = new Ray(cam.transform.position, cam.transform.forward);
+        bool aimed = Aim(owner, dist, out RaycastHit hit, preferPieces: false, allowPieceSteal: false);
+        bool water = BoatWater.RaycastSurface(ray, dist, out Vector3 waterPt, out float waterY);
         float lift = ProjectExtent(rot, size, Vector3.up) + 0.04f;
+
+        if (water && (!aimed || (waterPt - ray.origin).magnitude + 0.04f < hit.distance))
+        {
+            pos = new Vector3(waterPt.x, waterY + lift, waterPt.z);
+            return true;
+        }
+
+        if (!aimed)
+            return false;
+
+        BoatMaterialItem.PromoteAround(hit.point, Mathf.Max(0.6f, Mathf.Max(size.x, size.z) * 0.35f));
         float y = hit.point.y;
-        if (TryBlockedSupportY(hit.point, y, rot, size, owner, out float supportY))
+        if (hit.collider != null && hit.collider.GetComponentInParent<BoatWater>() != null)
+            y = water ? waterY : hit.point.y;
+        else if (TryBlockedSupportY(hit.point, y, rot, size, owner, out float supportY))
             y = supportY;
+        if (water && BoatWater.TryHeight(new Vector3(hit.point.x, y, hit.point.z), out float surface)
+            && y < surface - 0.02f)
+            y = surface;
         pos = new Vector3(hit.point.x, y + lift, hit.point.z);
         return true;
     }
@@ -207,8 +227,7 @@ public static class BoatBuildUtil
         if (rb != null)
         {
             rb.maxDepenetrationVelocity = 1.2f;
-            rb.linearVelocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
+            StopMotion(rb);
         }
 
         var box = piece.GetComponent<BoxCollider>();
@@ -259,10 +278,7 @@ public static class BoatBuildUtil
         {
             var otherRb = support.GetComponentInParent<Rigidbody>();
             if (otherRb != null)
-            {
-                otherRb.linearVelocity = Vector3.zero;
-                otherRb.angularVelocity = Vector3.zero;
-            }
+                StopMotion(otherRb);
         }
     }
 
@@ -619,6 +635,22 @@ public static class BoatBuildUtil
     }
 
     public static Vector3 Abs(Vector3 v) => new Vector3(Mathf.Abs(v.x), Mathf.Abs(v.y), Mathf.Abs(v.z));
+
+    public static void StopMotion(Rigidbody rb)
+    {
+        if (rb == null || rb.isKinematic)
+            return;
+        rb.linearVelocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
+    }
+
+    public static void SetMotion(Rigidbody rb, Vector3 linear, Vector3 angular)
+    {
+        if (rb == null || rb.isKinematic)
+            return;
+        rb.linearVelocity = linear;
+        rb.angularVelocity = angular;
+    }
 
     public static float ProjectExtent(Quaternion rot, Vector3 size, Vector3 n)
     {

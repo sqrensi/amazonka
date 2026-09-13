@@ -132,22 +132,24 @@ static class BoatPrefabBuilder
 
     static void BuildWater()
     {
-        var go = GameObject.CreatePrimitive(PrimitiveType.Plane);
-        go.name = "BoatWater";
-        go.transform.localScale = new Vector3(12f, 1f, 12f);
-        var meshCol = go.GetComponent<MeshCollider>();
-        if (meshCol != null)
-            Object.DestroyImmediate(meshCol);
+        var mesh = AssetDatabase.LoadAssetAtPath<Mesh>("Assets/IgniteCoders/Simple Water Shader/Resources/WaterBlock_50m.mesh");
+        var mat = AssetDatabase.LoadAssetAtPath<Material>("Assets/IgniteCoders/Simple Water Shader/Resources/Water_mat_01.mat");
+        var go = new GameObject("BoatWater");
+        var filter = go.AddComponent<MeshFilter>();
+        filter.sharedMesh = mesh;
+        var rend = go.AddComponent<MeshRenderer>();
+        rend.sharedMaterial = mat != null ? mat : UrpMat("BoatWater", new Color(0.18f, 0.48f, 0.72f), 0.05f, 0.85f);
+        rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        Bounds mb = mesh != null ? mesh.bounds : new Bounds(Vector3.zero, new Vector3(50f, 1f, 50f));
+        float depth = 14f;
         var box = go.AddComponent<BoxCollider>();
-        box.size = new Vector3(10f, 0.2f, 10f);
         box.isTrigger = true;
+        box.size = new Vector3(Mathf.Max(8f, mb.size.x), depth, Mathf.Max(8f, mb.size.z));
+        box.center = new Vector3(mb.center.x, mb.max.y - depth * 0.5f, mb.center.z);
         var water = go.AddComponent<BoatWater>();
         var so = new SerializedObject(water);
-        so.FindProperty("surfaceY").floatValue = 0f;
+        so.FindProperty("surfaceY").floatValue = mb.max.y;
         so.ApplyModifiedPropertiesWithoutUndo();
-        var r = go.GetComponent<MeshRenderer>();
-        if (r != null)
-            r.sharedMaterial = UrpMat("BoatWater", new Color(0.18f, 0.48f, 0.72f), 0.05f, 0.85f);
         PrefabUtility.SaveAsPrefabAsset(go, BoatDir + "/BoatWater.prefab");
         Object.DestroyImmediate(go);
     }

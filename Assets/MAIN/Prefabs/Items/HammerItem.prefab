@@ -100,8 +100,8 @@ GameObject:
   m_Component:
   - component: {fileID: 8248982464454319252}
   - component: {fileID: 749154594702132975}
-  - component: {fileID: 6645333243049269477}
-  - component: {fileID: 8663531080260884477}
+  - component: {fileID: 6439785909977785862}
+  - component: {fileID: 3662589086175464336}
   m_Layer: 0
   m_Name: HammerItem
   m_TagString: Untagged
@@ -146,11 +146,11 @@ MonoBehaviour:
   heldLocalPosition: {x: 0, y: 0, z: 0}
   heldLocalEuler: {x: 0, y: 0, z: 0}
   heldLocalScale: {x: 1, y: 1, z: 1}
-  retractedPositionOffset: {x: 0, y: 0.06, z: -0.28}
-  retractedEulerOffset: {x: -25, y: 0, z: 0}
-  retractSmoothTime: 0.12
-  useBlockThreshold: 0.5
---- !u!65 &6645333243049269477
+  retractedPositionOffset: {x: 0.015, y: -0.035, z: -0.2}
+  retractedEulerOffset: {x: -10, y: 6, z: -8}
+  retractSmoothTime: 0.42
+  useBlockThreshold: 0.82
+--- !u!65 &6439785909977785862
 BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -171,7 +171,7 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.2625, y: 0.34499997, z: 0.12}
   m_Center: {x: 0.0012499988, y: 0.022499993, z: 0}
---- !u!54 &8663531080260884477
+--- !u!54 &3662589086175464336
 Rigidbody:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

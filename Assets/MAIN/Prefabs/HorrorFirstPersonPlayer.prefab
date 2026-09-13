@@ -276,8 +276,8 @@ MonoBehaviour:
   dropUpSpeed: 1.35
   dropLookGain: 0.72
   dropLookArm: 0.52
-  obstructionStartDistance: 0.9
-  obstructionFullDistance: 0.35
+  obstructionStartDistance: 1.05
+  obstructionFullDistance: 0.22
   obstructionProbeRadius: 0.15
   obstructionMask:
     serializedVersion: 2
@@ -294,7 +294,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5266c58da0ba6449b470fde00832bc0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerInteractor
-  pickupRadius: 2.2
+  pickupRadius: 2.4
   mask:
     serializedVersion: 2
     m_Bits: 4294967295
