@@ -60,10 +60,17 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
     bool _droppedByPlayer;
 
     public string DisplayName => displayName;
+    public void SetDisplayName(string n)
+    {
+        if (!string.IsNullOrEmpty(n))
+            displayName = n;
+    }
     public int PreferredSlot => preferredSlot;
     public HeldItem UpgradeResultPrefab => upgradeResultPrefab;
     public bool CanUpgrade => upgradeResultPrefab != null;
     public bool IsCarried => _carried;
+    /// <summary>Не выключать объект в инвентаре (верёвка / живая деталь лодки).</summary>
+    public virtual bool KeepActiveInInventory => false;
     public bool WasDroppedByPlayer => _droppedByPlayer;
     public bool IsEquipped => _carried && Inventory != null && Inventory.Current == this;
 
@@ -79,7 +86,9 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
 
     public bool CanInteract(GameObject interactor)
     {
-        if (_carried || interactor == null)
+        if (_carried || !isActiveAndEnabled || interactor == null)
+            return false;
+        if (GetComponent<BoatPiece>() != null)
             return false;
         if (!IsPickupReady())
             return false;
@@ -130,6 +139,15 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
         _renderers = GetComponentsInChildren<Renderer>(true);
         _ownerMove = owner != null ? owner.GetComponent<HorrorFirstPersonController>() : null;
         _equip = 0f;
+    }
+
+    public void ReleaseFromHands()
+    {
+        _carried = false;
+        Inventory = null;
+        Owner = null;
+        _ownerMove = null;
+        SetPhysicsEnabled(true);
     }
 
     public void AttachToInventory(PlayerInventory inventory, GameObject owner)
@@ -351,6 +369,12 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
         EnsurePhysics();
         if (_col != null)
             _col.enabled = on;
+        var cols = GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < cols.Length; i++)
+        {
+            if (cols[i] != null)
+                cols[i].enabled = on;
+        }
         if (_rb != null)
         {
             _rb.detectCollisions = on;
@@ -515,6 +539,26 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
     public virtual void OnEquip()
     {
         _equip = 0f;
+    }
+
+    /// <summary>Живая деталь с верёвкой: оставить в мире, слот не теряем.</summary>
+    public void ParkInWorld(GameObject ignoreWith)
+    {
+        transform.SetParent(null, true);
+        gameObject.SetActive(true);
+        SetPhysicsEnabled(true);
+        Physics.SyncTransforms();
+        KeepAboveGround();
+        if (_rb != null)
+        {
+            _rb.linearVelocity = Vector3.zero;
+            _rb.angularVelocity = Vector3.zero;
+        }
+        if (ignoreWith != null)
+        {
+            StopIgnoreRoutine();
+            _ignoreRoutine = StartCoroutine(IgnorePlayerUntilClear(ignoreWith));
+        }
     }
 
     public virtual void OnUnequip()

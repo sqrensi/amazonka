@@ -125,6 +125,8 @@ public class HorrorFirstPersonController : MonoBehaviour
     float _stepPunchVel;
     float _landOffsetVel;
     float _bobWeight;
+    float _airAudioTime;
+    readonly Collider[] _groundOverlap = new Collider[16];
 
     public float StaminaNormalized =>
         !useStamina || maxStamina <= 0f ? 1f : _stamina / maxStamina;
@@ -140,6 +142,10 @@ public class HorrorFirstPersonController : MonoBehaviour
     public float BobWeight => _bobWeight;
     public float LandPunch => _landOffset;
     public float StepPunch => _stepPunch;
+    /// <summary>Скорость ввода движения (для гребли на лодке).</summary>
+    public Vector2 MoveInput => _moveInput;
+    /// <summary>Игрок сидит на лодке — обычный мотор капсулы выключен.</summary>
+    public bool MovementLocked { get; set; }
 
     void Awake()
     {
@@ -296,6 +302,12 @@ public class HorrorFirstPersonController : MonoBehaviour
 
     void UpdateMotor(float dt)
     {
+        if (MovementLocked)
+        {
+            _jumpQueued = false;
+            return;
+        }
+
         Vector3 planar = transform.right * _moveInput.x + transform.forward * _moveInput.y;
         if (planar.sqrMagnitude > 1f)
             planar.Normalize();
@@ -413,12 +425,27 @@ public class HorrorFirstPersonController : MonoBehaviour
                 continue;
             if (hits[i].normal.y >= minY)
                 return true;
+            if (hits[i].collider != null && hits[i].collider.GetComponentInParent<BoatPiece>() != null)
+                return true;
         }
 
         if (Physics.Raycast(transform.position + Vector3.up * 0.28f, Vector3.down, out RaycastHit ray,
-                0.42f, groundMask, QueryTriggerInteraction.Ignore))
+                0.55f, groundMask, QueryTriggerInteraction.Ignore))
         {
-            if (ray.transform != transform && !ray.transform.IsChildOf(transform) && ray.normal.y >= minY)
+            if (ray.transform != transform && !ray.transform.IsChildOf(transform) &&
+                (ray.normal.y >= minY || ray.collider.GetComponentInParent<BoatPiece>() != null))
+                return true;
+        }
+
+        // Тонкие доски уже перекрыты капсулой — SphereCast их пропускает.
+        Vector3 feet = transform.position + Vector3.up * 0.12f;
+        int n = Physics.OverlapSphereNonAlloc(feet, radius + 0.06f, _groundOverlap, groundMask, QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < n; i++)
+        {
+            var col = _groundOverlap[i];
+            if (col == null || col.transform == transform || col.transform.IsChildOf(transform))
+                continue;
+            if (col.GetComponentInParent<BoatPiece>() != null)
                 return true;
         }
 
@@ -523,12 +550,18 @@ public class HorrorFirstPersonController : MonoBehaviour
     {
         if (!grounded)
         {
-            if (footstepSource != null && footstepSource.isPlaying)
+            _airAudioTime += dt;
+            if (_airAudioTime > 0.18f && footstepSource != null && footstepSource.isPlaying)
                 footstepSource.Stop();
-            _stepTimer = 0f;
-            _strideStarted = false;
+            if (_airAudioTime > 0.18f)
+            {
+                _stepTimer = 0f;
+                _strideStarted = false;
+            }
             return;
         }
+
+        _airAudioTime = 0f;
 
         if (moveAmount < 0.2f)
         {

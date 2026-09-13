@@ -101,7 +101,8 @@ public class PlayerInventory : MonoBehaviour
             return false;
 
         item.AttachToInventory(this, gameObject);
-        item.gameObject.SetActive(false);
+        if (!item.KeepActiveInInventory)
+            item.gameObject.SetActive(false);
         item.ApplyHeldPose();
         _slots[slot] = item;
 
@@ -157,7 +158,10 @@ public class PlayerInventory : MonoBehaviour
         if (Current != null)
         {
             Current.OnUnequip();
-            Current.gameObject.SetActive(false);
+            if (Current.KeepActiveInInventory)
+                Current.ParkInWorld(gameObject);
+            else
+                Current.gameObject.SetActive(false);
         }
 
         _equipped = index;
@@ -165,6 +169,8 @@ public class PlayerInventory : MonoBehaviour
         HeldItem next = _slots[index];
         if (next != null)
         {
+            if (next.KeepActiveInInventory)
+                next.AttachToInventory(this, gameObject);
             next.gameObject.SetActive(true);
             next.ResetRetract();
             next.OnEquip();
@@ -231,13 +237,27 @@ public class PlayerInventory : MonoBehaviour
         if (Current != null)
         {
             Current.OnUnequip();
-            Current.gameObject.SetActive(false);
+            if (Current.KeepActiveInInventory)
+                Current.ParkInWorld(gameObject);
+            else
+                Current.gameObject.SetActive(false);
         }
         _equipped = -1;
         OnInventoryChanged?.Invoke();
     }
 
-    /// <summary>Забрать предмет из слота (для рулетки/перемещения). Возвращает предмет или null.</summary>
+    /// <summary>Снять предмет с рук, не уничтожая объект (кладём ту же доску обратно в мир).</summary>
+    public void ClearEquippedKeepObject()
+    {
+        if (Current == null)
+            return;
+        int slot = _equipped;
+        Current.OnUnequip();
+        Current.ReleaseFromHands();
+        _slots[slot] = null;
+        _equipped = -1;
+        OnInventoryChanged?.Invoke();
+    }
     public HeldItem ExtractSlot(int index)
     {
         if (index < 0 || index >= SlotCount)
@@ -269,6 +289,34 @@ public class PlayerInventory : MonoBehaviour
         Destroy(item.gameObject);
         OnInventoryChanged?.Invoke();
         return true;
+    }
+
+    public T FindFirst<T>() where T : HeldItem
+    {
+        for (int i = 0; i < SlotCount; i++)
+            if (_slots[i] is T t)
+                return t;
+        return null;
+    }
+
+    public bool ConsumeFirst<T>() where T : HeldItem
+    {
+        for (int i = 0; i < SlotCount; i++)
+        {
+            if (_slots[i] is not T)
+                continue;
+            HeldItem item = _slots[i];
+            if (_equipped == i)
+            {
+                item.OnUnequip();
+                _equipped = -1;
+            }
+            _slots[i] = null;
+            Destroy(item.gameObject);
+            OnInventoryChanged?.Invoke();
+            return true;
+        }
+        return false;
     }
 
     /// <summary>Положить предмет в конкретный слот (должен быть пуст). Возвращает успех.</summary>

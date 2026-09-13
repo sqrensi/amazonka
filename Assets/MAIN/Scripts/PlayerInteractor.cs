@@ -2,34 +2,33 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Ищет ближайший интерактивный объект <see cref="IInteractable"/> рядом с игроком
-/// (по радиусу, без наведения лучом). Держит текущую цель для показа подсказки в HUD
-/// и по нажатию F выполняет взаимодействие (подбор предмета и т.п.).
+/// Цель взаимодействия — то, на что смотрит прицел. Иначе ближайший объект у центра экрана.
 /// </summary>
 public class PlayerInteractor : MonoBehaviour
 {
-    [Tooltip("Радиус, в котором можно подобрать/использовать предмет рядом.")]
-    [SerializeField] float pickupRadius = 2.2f;
-    [Tooltip("Слои, на которых ищем интерактивные объекты.")]
+    [SerializeField] float pickupRadius = 2.4f;
     [SerializeField] LayerMask mask = ~0;
 
     readonly Collider[] _buffer = new Collider[32];
+    readonly RaycastHit[] _hits = new RaycastHit[24];
 
     IInteractable _current;
     Component _currentComponent;
+    Camera _cam;
 
-    /// <summary>Ближайшая интерактивная цель в радиусе (или null).</summary>
     public IInteractable Current => _current;
-    /// <summary>MonoBehaviour текущей цели (для доступа к Transform/якорю).</summary>
     public Component CurrentComponent => _currentComponent;
     public bool HasTarget => _current != null && _currentComponent != null;
 
     void Awake()
     {
+        _cam = GetComponentInChildren<Camera>();
         if (GetComponent<PickupPromptHUD>() == null)
             gameObject.AddComponent<PickupPromptHUD>();
         if (GetComponent<KillNoticeHUD>() == null)
             gameObject.AddComponent<KillNoticeHUD>();
+        if (GetComponent<BoatBuildHud>() == null)
+            gameObject.AddComponent<BoatBuildHud>();
     }
 
     void Update()
@@ -41,36 +40,100 @@ public class PlayerInteractor : MonoBehaviour
     {
         _current = null;
         _currentComponent = null;
+        if (_cam == null)
+            _cam = GetComponentInChildren<Camera>();
+        if (_cam == null)
+            return;
+
+        Ray ray = _cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+        int hitCount = Physics.RaycastNonAlloc(ray, _hits, pickupRadius + 0.6f, mask, QueryTriggerInteraction.Collide);
+        int bestHit = -1;
+        float bestHitDist = float.MaxValue;
+        for (int i = 0; i < hitCount; i++)
+        {
+            if (!TryInteractable(_hits[i].collider, out _, out _))
+                continue;
+            if (_hits[i].distance < bestHitDist)
+            {
+                bestHitDist = _hits[i].distance;
+                bestHit = i;
+            }
+        }
+
+        if (bestHit < 0)
+        {
+            int sphere = Physics.SphereCastNonAlloc(ray, 0.12f, _hits, pickupRadius, mask, QueryTriggerInteraction.Collide);
+            for (int i = 0; i < sphere; i++)
+            {
+                if (!TryInteractable(_hits[i].collider, out _, out _))
+                    continue;
+                if (_hits[i].distance < bestHitDist)
+                {
+                    bestHitDist = _hits[i].distance;
+                    bestHit = i;
+                }
+            }
+        }
+
+        if (bestHit >= 0 && TryInteractable(_hits[bestHit].collider, out IInteractable aimed, out Component aimedComp))
+        {
+            _current = aimed;
+            _currentComponent = aimedComp;
+            return;
+        }
 
         Vector3 origin = transform.position;
+        Vector3 aim = _cam.transform.forward;
+        Vector3 eye = _cam.transform.position;
         int count = Physics.OverlapSphereNonAlloc(origin, pickupRadius, _buffer, mask, QueryTriggerInteraction.Collide);
-
-        float bestSqr = float.MaxValue;
+        float bestScore = -1f;
         for (int i = 0; i < count; i++)
         {
-            var col = _buffer[i];
-            if (col == null)
+            if (!TryInteractable(_buffer[i], out IInteractable interactable, out Component component))
                 continue;
-
-            var interactable = col.GetComponentInParent<IInteractable>();
-            if (interactable == null || !interactable.CanInteract(gameObject))
+            Vector3 to = component.transform.position - eye;
+            float dist = to.magnitude;
+            if (dist < 0.01f || dist > pickupRadius)
                 continue;
-
-            var component = interactable as Component;
-            if (component == null)
+            float align = Vector3.Dot(aim, to / dist);
+            if (align < 0.72f)
                 continue;
-
-            float sqr = (component.transform.position - origin).sqrMagnitude;
-            if (sqr < bestSqr)
+            float score = align * 4f - dist * 0.15f;
+            if (score > bestScore)
             {
-                bestSqr = sqr;
+                bestScore = score;
                 _current = interactable;
                 _currentComponent = component;
             }
         }
     }
 
-    // Ввод (PlayerInput, SendMessages) — F (предметы) и E (босс).
+    bool TryInteractable(Collider col, out IInteractable interactable, out Component component)
+    {
+        interactable = null;
+        component = null;
+        if (col == null)
+            return false;
+        Transform t = col.transform;
+        if (t == transform || t.IsChildOf(transform))
+            return false;
+
+        var behaviours = col.GetComponentsInParent<MonoBehaviour>(true);
+        for (int b = 0; b < behaviours.Length; b++)
+        {
+            if (behaviours[b] is not IInteractable candidate)
+                continue;
+            if (!candidate.CanInteract(gameObject))
+                continue;
+            if (string.IsNullOrEmpty(candidate.GetPrompt()))
+                continue;
+            component = behaviours[b];
+            interactable = candidate;
+            return true;
+        }
+        return false;
+    }
+
     public void OnInteract(InputValue value)
     {
         if (!value.isPressed)

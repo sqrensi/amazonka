@@ -52,6 +52,11 @@ public class PickupPromptHUD : MonoBehaviour
         _panel.position = screen + new Vector3(0f, bob, 0f);
         string key = _interactor.Current.GetInteractKey();
         string prompt = _interactor.Current.GetPrompt();
+        if (string.IsNullOrEmpty(prompt))
+        {
+            _root.SetActive(false);
+            return;
+        }
         _label.text = $"<color=#8FFFB0>{key}</color>   {prompt}";
     }
 
