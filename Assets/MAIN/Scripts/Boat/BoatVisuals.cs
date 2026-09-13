@@ -21,6 +21,25 @@ public static class BoatVisuals
     public static Material Barrel => _barrel != null ? _barrel : (_barrel = Opaque(new Color(0.55f, 0.28f, 0.14f)));
     public static Material Metal => _metal != null ? _metal : (_metal = Opaque(new Color(0.62f, 0.64f, 0.68f), 0.65f, 0.4f));
     public static Material Rope => _rope != null ? _rope : (_rope = Opaque(new Color(0.7f, 0.58f, 0.32f)));
+    static Material _ropeLine;
+    public static Material RopeLine
+    {
+        get
+        {
+            if (_ropeLine != null)
+                return _ropeLine;
+            Shader s = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default") ?? Shader.Find("Unlit/Color");
+            _ropeLine = s != null ? new Material(s) : Opaque(new Color(0.7f, 0.58f, 0.32f));
+            _ropeLine.name = "BoatRopeLine";
+            var c = new Color(0.72f, 0.55f, 0.28f, 1f);
+            _ropeLine.color = c;
+            if (_ropeLine.HasProperty("_BaseColor"))
+                _ropeLine.SetColor("_BaseColor", c);
+            if (_ropeLine.HasProperty("_Color"))
+                _ropeLine.SetColor("_Color", c);
+            return _ropeLine;
+        }
+    }
     public static Material Ghost => _ghost != null ? _ghost : (_ghost = Opaque(new Color(0.45f, 0.85f, 0.5f)));
     static Material _sawMark;
     public static Material SawMark

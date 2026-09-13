@@ -21,7 +21,7 @@ public class BoatPiece : MonoBehaviour, IInteractable
     static readonly List<BoatPiece> IslandQueue = new List<BoatPiece>(32);
     static readonly List<BoatPiece> IslandTmp = new List<BoatPiece>(32);
     static readonly HashSet<BoatPiece> IslandSeen = new HashSet<BoatPiece>();
-    static readonly Collider[] OverlapScratch = new Collider[24];
+    static readonly Collider[] OverlapScratch = new Collider[48];
 
     public BoatPieceKind Kind => kind;
     public Rigidbody Body => _rb;
@@ -31,19 +31,87 @@ public class BoatPiece : MonoBehaviour, IInteractable
 
     public string GetPrompt()
     {
-        if (IsLockedInBoat())
+        if (!CanBeCarried())
             return "";
+        CollectIsland(IslandTmp);
+        if (IslandTmp.Count > 1)
+            return IslandTmp.Count > 2 ? "Pick up boat" : "Pick up assembly";
         return $"Pick up {KindName(kind)}";
     }
 
     public string GetInteractKey() => "F";
-    public Transform GetAnchor() => transform;
+
+    public Transform GetAnchor()
+    {
+        CollectIsland(IslandTmp);
+        if (IslandTmp.Count <= 1)
+            return transform;
+        BoatPiece lead = IslandLeaderFrom(IslandTmp);
+        return lead.PromptAnchor(IslandTmp);
+    }
+
+    public BoatPiece IslandLeader()
+    {
+        CollectIsland(IslandTmp);
+        return IslandLeaderFrom(IslandTmp);
+    }
+
+    static BoatPiece IslandLeaderFrom(List<BoatPiece> island)
+    {
+        BoatPiece lead = island[0];
+        int best = lead.GetInstanceID();
+        for (int i = 1; i < island.Count; i++)
+        {
+            var p = island[i];
+            if (p == null)
+                continue;
+            int id = p.GetInstanceID();
+            if (id < best)
+            {
+                best = id;
+                lead = p;
+            }
+        }
+        return lead;
+    }
+
+    Transform _promptAnchor;
+
+    Transform PromptAnchor(List<BoatPiece> island)
+    {
+        if (_promptAnchor == null)
+        {
+            var go = new GameObject("IslandPrompt");
+            _promptAnchor = go.transform;
+            _promptAnchor.SetParent(transform, false);
+        }
+
+        bool any = false;
+        Bounds b = default;
+        for (int i = 0; i < island.Count; i++)
+        {
+            var p = island[i];
+            if (p == null)
+                continue;
+            var box = p.GetComponent<BoxCollider>();
+            Bounds pb = box != null ? box.bounds : new Bounds(p.transform.position, p.PieceSize);
+            if (!any)
+            {
+                b = pb;
+                any = true;
+            }
+            else
+                b.Encapsulate(pb);
+        }
+        _promptAnchor.position = any ? b.center : transform.position;
+        return _promptAnchor;
+    }
 
     public bool CanInteract(GameObject interactor)
     {
         if (interactor == null || !isActiveAndEnabled)
             return false;
-        if (IsLockedInBoat())
+        if (!CanBeCarried())
             return false;
         var inv = interactor.GetComponent<PlayerInventory>();
         return inv != null && inv.HasFreeSlot();
@@ -51,18 +119,30 @@ public class BoatPiece : MonoBehaviour, IInteractable
 
     public void Interact(GameObject interactor)
     {
-        if (IsLockedInBoat())
-            return;
-
         var inv = interactor.GetComponent<PlayerInventory>();
-        if (inv == null)
+        if (inv == null || !CanBeCarried())
             return;
 
+        CollectIsland(IslandTmp);
+        if (IslandTmp.Count > 1)
+        {
+            BoatClusterItem.TryPickup(IslandTmp, inv);
+            return;
+        }
         CarrySameObject(inv);
+    }
+
+    bool CanBeCarried()
+    {
+        if (GetComponentInParent<BoatClusterItem>() != null)
+            return false;
+        var held = GetComponentInParent<HeldItem>();
+        return held == null || !held.IsCarried;
     }
 
     bool CarrySameObject(PlayerInventory inv)
     {
+        DetachLooseNails();
         BoatMaterialItem.BeginCarry(kind, pieceSize, KindName(kind), transform.rotation);
         var item = gameObject.GetComponent<BoatMaterialItem>();
         if (item == null)
@@ -138,6 +218,94 @@ public class BoatPiece : MonoBehaviour, IInteractable
     {
         if (nail != null)
             _nails.Remove(nail);
+    }
+
+    public void SleepForCarry()
+    {
+        if (_rb != null)
+        {
+            _rb.linearVelocity = Vector3.zero;
+            _rb.angularVelocity = Vector3.zero;
+            _rb.isKinematic = true;
+            _rb.detectCollisions = false;
+        }
+        var cols = GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < cols.Length; i++)
+            if (cols[i] != null)
+                cols[i].enabled = false;
+        for (int i = 0; i < _nails.Count; i++)
+            _nails[i]?.DisconnectJointKeepState();
+        enabled = false;
+    }
+
+    public void WakeInWorld(bool physicsLive = true)
+    {
+        enabled = true;
+        var rs = GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < rs.Length; i++)
+        {
+            if (rs[i] == null)
+                continue;
+            var nail = rs[i].GetComponentInParent<BoatNail>();
+            if (nail != null && nail.Driven)
+                continue;
+            rs[i].enabled = true;
+        }
+        ApplyPhysics();
+        if (!physicsLive && _rb != null)
+        {
+            _rb.isKinematic = true;
+            _rb.detectCollisions = false;
+            _rb.linearVelocity = Vector3.zero;
+            _rb.angularVelocity = Vector3.zero;
+        }
+        var nails = GetComponentsInChildren<BoatNail>(true);
+        for (int i = 0; i < nails.Length; i++)
+        {
+            if (nails[i] == null || nails[i].Driven)
+                continue;
+            var cols = nails[i].GetComponentsInChildren<Collider>(true);
+            for (int c = 0; c < cols.Length; c++)
+                if (cols[c] != null)
+                    cols[c].enabled = true;
+        }
+    }
+
+    public void ResumePhysics(Vector3 velocity)
+    {
+        if (_rb == null)
+            _rb = GetComponent<Rigidbody>();
+        if (_rb == null)
+            return;
+        _rb.isKinematic = false;
+        _rb.detectCollisions = true;
+        _rb.useGravity = true;
+        _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+        _rb.maxDepenetrationVelocity = 6f;
+        _rb.linearVelocity = velocity;
+        _rb.angularVelocity = Vector3.zero;
+    }
+
+    void DetachLooseNails()
+    {
+        for (int i = _nails.Count - 1; i >= 0; i--)
+        {
+            var n = _nails[i];
+            if (n == null)
+            {
+                _nails.RemoveAt(i);
+                continue;
+            }
+            if (n.Driven)
+                continue;
+            if (n.A != null)
+                n.A.UnregisterNail(n);
+            if (n.B != null)
+                n.B.UnregisterNail(n);
+            n.A = null;
+            n.B = null;
+            n.transform.SetParent(null, true);
+        }
     }
 
     public bool HasDrivenNail()
@@ -406,23 +574,40 @@ public class BoatPiece : MonoBehaviour, IInteractable
     {
         a = null;
         b = null;
+        BoatMaterialItem.PromoteAround(point, radius + 0.2f);
         int n = Physics.OverlapSphereNonAlloc(point, radius, OverlapScratch, ~0, QueryTriggerInteraction.Ignore);
-        BoatPiece first = null;
+        BoatPiece best1 = null;
+        BoatPiece best2 = null;
+        float d1 = float.PositiveInfinity;
+        float d2 = float.PositiveInfinity;
         for (int i = 0; i < n; i++)
         {
-            var p = OverlapScratch[i] != null ? OverlapScratch[i].GetComponentInParent<BoatPiece>() : null;
-            if (p == null)
+            var col = OverlapScratch[i];
+            var p = col != null ? col.GetComponentInParent<BoatPiece>() : null;
+            if (p == null || !p.isActiveAndEnabled || p == best1)
                 continue;
-            if (first == null)
-                first = p;
-            else if (p != first)
+            if (p.GetComponentInParent<BoatClusterItem>() != null)
+                continue;
+            Vector3 closest = col.ClosestPoint(point);
+            float d = (closest - point).sqrMagnitude;
+            if (d < d1)
             {
-                a = first;
-                b = p;
-                return true;
+                d2 = d1;
+                best2 = best1;
+                d1 = d;
+                best1 = p;
+            }
+            else if (p != best1 && d < d2)
+            {
+                d2 = d;
+                best2 = p;
             }
         }
-        return false;
+        if (best1 == null || best2 == null)
+            return false;
+        a = best1;
+        b = best2;
+        return true;
     }
 
     public static BoatPiece Ray(Ray ray, float dist, out RaycastHit hit)
@@ -449,6 +634,12 @@ public class BoatPiece : MonoBehaviour, IInteractable
         if (_box == null)
             _box = gameObject.AddComponent<BoxCollider>();
         _box.size = pieceSize;
+        if (kind == BoatPieceKind.Plank)
+        {
+            Vector3 s = _box.size;
+            s.y = Mathf.Max(s.y, 0.07f);
+            _box.size = s;
+        }
         _box.center = _colCenter;
         _box.isTrigger = false;
         _box.enabled = true;
@@ -459,13 +650,31 @@ public class BoatPiece : MonoBehaviour, IInteractable
         _rb.mass = Mathf.Max(0.4f, BoatVisuals.Mass(kind) * (pieceSize.x * pieceSize.y * pieceSize.z) /
             (BoatVisuals.DefaultSize(kind).x * BoatVisuals.DefaultSize(kind).y * BoatVisuals.DefaultSize(kind).z));
         _rb.interpolation = RigidbodyInterpolation.Interpolate;
-        _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-        _rb.linearDamping = 0.35f;
-        _rb.angularDamping = 0.55f;
-        _rb.maxDepenetrationVelocity = 1.2f;
+        _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+        _rb.linearDamping = 0.45f;
+        _rb.angularDamping = 0.7f;
+        _rb.maxDepenetrationVelocity = 6f;
         _rb.detectCollisions = true;
         _rb.isKinematic = false;
         _rb.useGravity = true;
+        if (_box.sharedMaterial == null)
+            _box.sharedMaterial = WoodPhysMat();
+    }
+
+    static PhysicsMaterial _woodPhys;
+    static PhysicsMaterial WoodPhysMat()
+    {
+        if (_woodPhys != null)
+            return _woodPhys;
+        _woodPhys = new PhysicsMaterial("BoatWood")
+        {
+            dynamicFriction = 0.72f,
+            staticFriction = 0.85f,
+            bounciness = 0f,
+            frictionCombine = PhysicsMaterialCombine.Maximum,
+            bounceCombine = PhysicsMaterialCombine.Minimum
+        };
+        return _woodPhys;
     }
 
     public static string KindName(BoatPieceKind k)

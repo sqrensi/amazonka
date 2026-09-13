@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public static class BoatBuildUtil
 {
@@ -10,7 +11,7 @@ public static class BoatBuildUtil
         return c != null ? c : Camera.main;
     }
 
-    public static bool Aim(GameObject owner, float dist, out RaycastHit hit, bool preferPieces = false)
+    public static bool Aim(GameObject owner, float dist, out RaycastHit hit, bool preferPieces = false, bool allowPieceSteal = true)
     {
         hit = default;
         Camera cam = Cam(owner);
@@ -53,7 +54,7 @@ public static class BoatBuildUtil
                 hasPiece = true;
             }
         }
-        if (hasPiece && (preferPieces || bestPiece <= bestAny + 0.85f))
+        if (hasPiece && (preferPieces || (allowPieceSteal && bestPiece <= bestAny + 0.85f)))
         {
             hit = pieceHit;
             return true;
@@ -132,13 +133,18 @@ public static class BoatBuildUtil
     static readonly Collider[] SupportScratch = new Collider[32];
 
     /// <summary>
-    /// Верх ближайших деталей под точкой прицела — чтобы доска легла на два бревна,
-    /// даже если луч попал в пол в щели между ними.
+    /// Верх тех деталей, в которые бокс реально врезается на этой высоте.
+    /// Рядом стоящие, но не пересекающиеся куски высоту не задают.
     /// </summary>
-    public static bool TrySupportTop(Vector3 point, float radius, GameObject ignore, out float topY)
+    public static bool TryBlockedSupportY(Vector3 xz, float floorY, Quaternion rot, Vector3 size, GameObject ignore, out float topY)
     {
-        topY = point.y;
-        int n = Physics.OverlapSphereNonAlloc(point, radius, SupportScratch, ~0, QueryTriggerInteraction.Ignore);
+        topY = float.NegativeInfinity;
+        float halfUp = ProjectExtent(rot, size, Vector3.up);
+        Vector3 pos = new Vector3(xz.x, floorY + halfUp + 0.02f, xz.z);
+        Vector3 half = size * 0.5f;
+        half.x = Mathf.Max(0.01f, half.x * 0.94f);
+        half.z = Mathf.Max(0.01f, half.z * 0.94f);
+        int n = Physics.OverlapBoxNonAlloc(pos, half, SupportScratch, rot, ~0, QueryTriggerInteraction.Ignore);
         bool any = false;
         for (int i = 0; i < n; i++)
         {
@@ -147,23 +153,31 @@ public static class BoatBuildUtil
                 continue;
             if (ignore != null && (col.transform == ignore.transform || col.transform.IsChildOf(ignore.transform)))
                 continue;
-            var piece = col.GetComponentInParent<BoatPiece>();
-            if (piece == null)
+            if (!IsBoatTarget(col))
                 continue;
-            Bounds b = col.bounds;
-            Vector3 closest = b.ClosestPoint(point);
-            Vector2 delta = new Vector2(closest.x - point.x, closest.z - point.z);
-            if (delta.sqrMagnitude > radius * radius)
+            if (col.bounds.max.y <= floorY + 0.005f)
                 continue;
-            if (b.max.y < point.y - 0.35f)
-                continue;
-            if (!any || b.max.y > topY)
+            if (!any || col.bounds.max.y > topY)
             {
-                topY = b.max.y;
+                topY = col.bounds.max.y;
                 any = true;
             }
         }
         return any;
+    }
+
+    public static bool TryPlacePose(GameObject owner, float dist, Vector3 size, Quaternion rot, out Vector3 pos)
+    {
+        pos = default;
+        if (!Aim(owner, dist, out RaycastHit hit, preferPieces: false, allowPieceSteal: false))
+            return false;
+        BoatMaterialItem.PromoteAround(hit.point, Mathf.Max(0.6f, Mathf.Max(size.x, size.z) * 0.35f));
+        float lift = ProjectExtent(rot, size, Vector3.up) + 0.04f;
+        float y = hit.point.y;
+        if (TryBlockedSupportY(hit.point, y, rot, size, owner, out float supportY))
+            y = supportY;
+        pos = new Vector3(hit.point.x, y + lift, hit.point.z);
+        return true;
     }
 
     public static BoatNail SpawnNail(BoatPiece a, BoatPiece b, Vector3 pos, Vector3 dir)
@@ -171,10 +185,10 @@ public static class BoatBuildUtil
         var go = new GameObject("Nail");
         go.transform.SetParent(a.transform, true);
         go.transform.position = pos;
-        go.transform.rotation = Quaternion.FromToRotation(Vector3.up, dir.sqrMagnitude > 0.01f ? dir.normalized : Vector3.up);
-        BoatVisuals.Attach(go.transform, PrimitiveType.Cylinder, new Vector3(0.02f, 0.06f, 0.02f), BoatVisuals.Metal);
+        go.transform.rotation = Quaternion.identity;
+        BoatVisuals.Attach(go.transform, PrimitiveType.Cylinder, new Vector3(0.022f, 0.07f, 0.022f), BoatVisuals.Metal);
         var box = go.AddComponent<BoxCollider>();
-        box.size = new Vector3(0.03f, 0.12f, 0.03f);
+        box.size = new Vector3(0.045f, 0.16f, 0.045f);
         box.isTrigger = true;
         var nail = go.AddComponent<BoatNail>();
         nail.A = a;
@@ -227,6 +241,20 @@ public static class BoatBuildUtil
             }
         }
 
+        Unstuck(piece);
+
+        float floorY = piece.transform.position.y - ProjectExtent(piece.transform.rotation, piece.PieceSize, Vector3.up);
+        if (TryBlockedSupportY(piece.transform.position, floorY, piece.transform.rotation, piece.PieceSize, piece.gameObject, out float top))
+        {
+            float need = top + ProjectExtent(piece.transform.rotation, piece.PieceSize, Vector3.up) + 0.02f;
+            if (piece.transform.position.y < need)
+            {
+                Vector3 p = piece.transform.position;
+                p.y = need;
+                piece.transform.position = p;
+            }
+        }
+
         if (support != null)
         {
             var otherRb = support.GetComponentInParent<Rigidbody>();
@@ -236,5 +264,192 @@ public static class BoatBuildUtil
                 otherRb.angularVelocity = Vector3.zero;
             }
         }
+    }
+
+    public static void SettleCluster(System.Collections.Generic.List<BoatPiece> pieces)
+    {
+        if (pieces == null || pieces.Count == 0)
+            return;
+
+        bool any = false;
+        Bounds b = default;
+        for (int i = 0; i < pieces.Count; i++)
+        {
+            var p = pieces[i];
+            if (p == null)
+                continue;
+            var box = p.GetComponent<BoxCollider>();
+            Bounds pb = box != null ? box.bounds : new Bounds(p.transform.position, p.PieceSize);
+            if (!any)
+            {
+                b = pb;
+                any = true;
+            }
+            else
+                b.Encapsulate(pb);
+        }
+        if (!any)
+            return;
+
+        Vector3 origin = b.center + Vector3.up * 1.6f;
+        var hits = Physics.RaycastAll(origin, Vector3.down, 8f, ~0, QueryTriggerInteraction.Ignore);
+        float best = float.PositiveInfinity;
+        Vector3 ground = origin;
+        bool found = false;
+        for (int i = 0; i < hits.Length; i++)
+        {
+            var col = hits[i].collider;
+            if (col == null)
+                continue;
+            var hitPiece = col.GetComponentInParent<BoatPiece>();
+            bool own = false;
+            for (int p = 0; p < pieces.Count; p++)
+            {
+                if (pieces[p] != null && (hitPiece == pieces[p] || col.transform.IsChildOf(pieces[p].transform)))
+                {
+                    own = true;
+                    break;
+                }
+            }
+            if (own)
+                continue;
+            if (hits[i].distance < best)
+            {
+                best = hits[i].distance;
+                ground = hits[i].point;
+                found = true;
+            }
+        }
+        if (found)
+        {
+            float lift = ground.y + 0.02f - b.min.y;
+            if (lift > 0.001f)
+            {
+                Vector3 delta = Vector3.up * lift;
+                for (int i = 0; i < pieces.Count; i++)
+                {
+                    if (pieces[i] != null)
+                        pieces[i].transform.position += delta;
+                }
+            }
+        }
+        Physics.SyncTransforms();
+        for (int i = 0; i < pieces.Count; i++)
+            Unstuck(pieces[i], pieces);
+    }
+
+    static readonly Collider[] UnstuckScratch = new Collider[24];
+
+    public static void Unstuck(BoatPiece piece, System.Collections.Generic.IList<BoatPiece> skipTogether = null)
+    {
+        if (piece == null)
+            return;
+        var box = piece.GetComponent<BoxCollider>();
+        if (box == null || !box.enabled)
+            return;
+
+        for (int pass = 0; pass < 6; pass++)
+        {
+            Physics.SyncTransforms();
+            Vector3 center = piece.transform.TransformPoint(box.center);
+            Vector3 half = box.size * 0.5f;
+            int n = Physics.OverlapBoxNonAlloc(
+                center, half, UnstuckScratch, piece.transform.rotation, ~0, QueryTriggerInteraction.Ignore);
+            float best = 0f;
+            for (int i = 0; i < n; i++)
+            {
+                var col = UnstuckScratch[i];
+                if (col == null || col == box)
+                    continue;
+                if (col.transform == piece.transform || col.transform.IsChildOf(piece.transform))
+                    continue;
+                var other = col.GetComponentInParent<BoatPiece>();
+                if (other == piece)
+                    continue;
+                if (skipTogether != null && other != null)
+                {
+                    bool skip = false;
+                    for (int s = 0; s < skipTogether.Count; s++)
+                    {
+                        if (skipTogether[s] == other)
+                        {
+                            skip = true;
+                            break;
+                        }
+                    }
+                    if (skip)
+                        continue;
+                }
+                if (!Physics.ComputePenetration(
+                        box, piece.transform.position, piece.transform.rotation,
+                        col, col.transform.position, col.transform.rotation,
+                        out Vector3 dir, out float dist)
+                    || dist < 0.0008f)
+                    continue;
+                if (dir.y < 0.2f)
+                    dir = Vector3.up;
+                if (dist > best)
+                    best = dist;
+            }
+            if (best <= 0f)
+                return;
+            piece.transform.position += Vector3.up * (best + 0.014f);
+        }
+    }
+
+    public static void TickPlaceRotate(ref float yaw, ref float pitch, ref float roll, ref float qHeld, ref float eHeld, float dt)
+    {
+        var kb = Keyboard.current;
+        const float tap = 5f;
+        const float holdDelay = 0.16f;
+        const float holdDeg = 120f;
+        bool shift = kb != null && (kb.leftShiftKey.isPressed || kb.rightShiftKey.isPressed);
+        float tapStep = shift ? 2f : tap;
+        float holdSpeed = shift ? holdDeg * 0.4f : holdDeg;
+
+        if (kb != null && kb.qKey.wasPressedThisFrame)
+        {
+            pitch -= tapStep;
+            qHeld = 0f;
+        }
+        if (kb != null && kb.eKey.wasPressedThisFrame)
+        {
+            pitch += tapStep;
+            eHeld = 0f;
+        }
+        if (kb != null && kb.qKey.isPressed)
+        {
+            qHeld += dt;
+            if (qHeld > holdDelay)
+                pitch -= holdSpeed * dt;
+        }
+        else
+            qHeld = 0f;
+        if (kb != null && kb.eKey.isPressed)
+        {
+            eHeld += dt;
+            if (eHeld > holdDelay)
+                pitch += holdSpeed * dt;
+        }
+        else
+            eHeld = 0f;
+        if (kb != null && kb.rKey.wasPressedThisFrame)
+            roll += 90f;
+
+        var mouse = Mouse.current;
+        if (mouse != null)
+        {
+            float scroll = mouse.scroll.ReadValue().y;
+            if (Mathf.Abs(scroll) > 0.01f)
+                yaw += scroll > 0f ? tapStep : -tapStep;
+        }
+    }
+
+    public static Vector3 Abs(Vector3 v) => new Vector3(Mathf.Abs(v.x), Mathf.Abs(v.y), Mathf.Abs(v.z));
+
+    public static float ProjectExtent(Quaternion rot, Vector3 size, Vector3 n)
+    {
+        Vector3 w = Abs(rot * size);
+        return 0.5f * Vector3.Dot(w, Abs(n.normalized));
     }
 }

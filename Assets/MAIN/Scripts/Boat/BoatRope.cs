@@ -140,6 +140,66 @@ public class BoatRope : MonoBehaviour
         }
     }
 
+    public static void ParentOwning(System.Collections.Generic.IList<BoatPiece> parts, Transform root)
+    {
+        if (parts == null || root == null)
+            return;
+        for (int i = 0; i < All.Count; i++)
+        {
+            var r = All[i];
+            if (r == null)
+                continue;
+            if (!OwnsParts(r, parts))
+                continue;
+            r.transform.SetParent(root, true);
+        }
+    }
+
+    public static void UnparentOwned(System.Collections.Generic.IList<BoatPiece> parts)
+    {
+        if (parts == null)
+            return;
+        for (int i = 0; i < All.Count; i++)
+        {
+            var r = All[i];
+            if (r == null)
+                continue;
+            if (!OwnsParts(r, parts))
+                continue;
+            r.transform.SetParent(null, true);
+        }
+    }
+
+    public static void RebuildOwned(System.Collections.Generic.IList<BoatPiece> parts)
+    {
+        if (parts == null)
+            return;
+        for (int i = 0; i < All.Count; i++)
+        {
+            var r = All[i];
+            if (r == null || !OwnsParts(r, parts))
+                continue;
+            r.RebuildJoint();
+        }
+    }
+
+    static bool OwnsParts(BoatRope r, System.Collections.Generic.IList<BoatPiece> parts)
+    {
+        bool a = false;
+        bool b = false;
+        for (int i = 0; i < parts.Count; i++)
+        {
+            var p = parts[i];
+            if (p == null)
+                continue;
+            if (r.BodyA == p.Body)
+                a = true;
+            if (r.BodyB == p.Body)
+                b = true;
+        }
+        return a && b;
+    }
+
     public static void SplitForCut(BoatPiece from, BoatPiece offcut, int axis, float cut, bool keepLeft)
     {
         if (from == null || offcut == null)
@@ -184,11 +244,12 @@ public class BoatRope : MonoBehaviour
             Destroy(_joint);
         _joint = null;
         BuildJoint();
+        RestoreVisual();
     }
 
     void BuildJoint()
     {
-        if (BodyA == null || BodyB == null)
+        if (BodyA == null || BodyB == null || AnchorA == null || AnchorB == null)
             return;
         _joint = BodyA.gameObject.AddComponent<SpringJoint>();
         _joint.connectedBody = BodyB;
@@ -204,19 +265,60 @@ public class BoatRope : MonoBehaviour
         _joint.enableCollision = true;
     }
 
+    public void RestoreVisual()
+    {
+        if (transform.parent == null)
+            transform.localScale = Vector3.one;
+        EnsureLine();
+        if (_line == null)
+            return;
+        bool carried = false;
+        var held = GetComponentInParent<HeldItem>();
+        if (held != null && held.IsCarried)
+            carried = true;
+        _line.enabled = !carried;
+        if (carried || AnchorA == null || AnchorB == null)
+            return;
+        _line.useWorldSpace = true;
+        _line.SetPosition(0, AnchorA.position);
+        _line.SetPosition(1, AnchorB.position);
+    }
+
+    void EnsureLine()
+    {
+        if (_line == null)
+            _line = GetComponent<LineRenderer>();
+        if (_line == null)
+            BuildLine();
+        else
+            ApplyLineSettings(_line);
+    }
+
     void BuildLine()
     {
         _line = gameObject.AddComponent<LineRenderer>();
-        _line.positionCount = 2;
-        _line.startWidth = 0.028f;
-        _line.endWidth = 0.028f;
-        _line.material = BoatVisuals.Rope;
-        _line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        ApplyLineSettings(_line);
+    }
+
+    static void ApplyLineSettings(LineRenderer line)
+    {
+        line.positionCount = 2;
+        line.startWidth = 0.032f;
+        line.endWidth = 0.032f;
+        line.useWorldSpace = true;
+        line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        line.receiveShadows = false;
+        line.numCapVertices = 4;
+        line.alignment = LineAlignment.View;
+        line.textureMode = LineTextureMode.Stretch;
+        line.material = BoatVisuals.RopeLine;
+        line.enabled = true;
     }
 
     void LateUpdate()
     {
-        if (_line == null || AnchorA == null || AnchorB == null)
+        RestoreVisual();
+        if (_line == null || !_line.enabled || AnchorA == null || AnchorB == null)
             return;
         _line.SetPosition(0, AnchorA.position);
         _line.SetPosition(1, AnchorB.position);

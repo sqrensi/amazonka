@@ -202,9 +202,9 @@ static class ItemPrefabBuilder
             var box = root.AddComponent<BoxCollider>();
             Bounds b = CalculateLocalBounds(root);
             Vector3 size = Vector3.Max(b.size, Vector3.one * 0.2f);
-            size.x = Mathf.Clamp(size.x, 0.12f, 0.55f);
-            size.y = Mathf.Clamp(size.y, 0.12f, 0.45f);
-            size.z = Mathf.Clamp(size.z, 0.12f, 0.7f);
+            size.x = Mathf.Clamp(size.x, 0.12f, 1.6f);
+            size.y = Mathf.Clamp(size.y, 0.04f, 0.8f);
+            size.z = Mathf.Clamp(size.z, 0.12f, 1.6f);
             box.center = b.center;
             box.size = size;
             changed = true;

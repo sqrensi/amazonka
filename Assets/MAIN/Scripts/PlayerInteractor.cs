@@ -77,8 +77,7 @@ public class PlayerInteractor : MonoBehaviour
 
         if (bestHit >= 0 && TryInteractable(_hits[bestHit].collider, out IInteractable aimed, out Component aimedComp))
         {
-            _current = aimed;
-            _currentComponent = aimedComp;
+            ResolveTarget(aimed, aimedComp, out _current, out _currentComponent);
             return;
         }
 
@@ -91,7 +90,8 @@ public class PlayerInteractor : MonoBehaviour
         {
             if (!TryInteractable(_buffer[i], out IInteractable interactable, out Component component))
                 continue;
-            Vector3 to = component.transform.position - eye;
+            ResolveTarget(interactable, component, out interactable, out component);
+            Vector3 to = PromptWorld(interactable, component) - eye;
             float dist = to.magnitude;
             if (dist < 0.01f || dist > pickupRadius)
                 continue;
@@ -106,6 +106,29 @@ public class PlayerInteractor : MonoBehaviour
                 _currentComponent = component;
             }
         }
+    }
+
+    void ResolveTarget(IInteractable interactable, Component component, out IInteractable resolved, out Component resolvedComp)
+    {
+        resolved = interactable;
+        resolvedComp = component;
+        if (interactable is BoatPiece piece)
+        {
+            var lead = piece.IslandLeader();
+            if (lead != null)
+            {
+                resolved = lead;
+                resolvedComp = lead;
+            }
+        }
+    }
+
+    static Vector3 PromptWorld(IInteractable interactable, Component component)
+    {
+        Transform a = interactable != null ? interactable.GetAnchor() : null;
+        if (a != null)
+            return a.position;
+        return component != null ? component.transform.position : Vector3.zero;
     }
 
     bool TryInteractable(Collider col, out IInteractable interactable, out Component component)

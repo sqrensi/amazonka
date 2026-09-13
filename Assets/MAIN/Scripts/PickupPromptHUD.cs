@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Подсказка у ближайшего pickup: клавиша и текст рядом с предметом на экране.
+/// Одна подсказка у предмета под прицелом. Скреплённая лодка — один якорь на всю сборку.
 /// </summary>
 public class PickupPromptHUD : MonoBehaviour
 {
@@ -38,7 +38,7 @@ public class PickupPromptHUD : MonoBehaviour
             return;
         }
 
-        Vector3 world = anchor.position + Vector3.up * 0.22f;
+        Vector3 world = anchor.position + Vector3.up * 0.18f;
         Vector3 screen = _camera.WorldToScreenPoint(world);
         if (screen.z <= 0.05f)
         {
@@ -46,17 +46,17 @@ public class PickupPromptHUD : MonoBehaviour
             return;
         }
 
-        _root.SetActive(true);
-        _panel.position = screen;
-        float bob = Mathf.Sin(Time.unscaledTime * 3.2f) * 5f;
-        _panel.position = screen + new Vector3(0f, bob, 0f);
-        string key = _interactor.Current.GetInteractKey();
         string prompt = _interactor.Current.GetPrompt();
         if (string.IsNullOrEmpty(prompt))
         {
             _root.SetActive(false);
             return;
         }
+
+        _root.SetActive(true);
+        float bob = Mathf.Sin(Time.unscaledTime * 3.2f) * 5f;
+        _panel.position = screen + new Vector3(0f, bob, 0f);
+        string key = _interactor.Current.GetInteractKey();
         _label.text = $"<color=#8FFFB0>{key}</color>   {prompt}";
     }
 

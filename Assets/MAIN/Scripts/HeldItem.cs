@@ -334,7 +334,8 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
         if (_col == null)
         {
             var box = gameObject.AddComponent<BoxCollider>();
-            FitBox(box);
+            if (GetComponent<BoatMaterialItem>() == null)
+                FitBox(box);
             _col = box;
         }
 
@@ -392,9 +393,9 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
     {
         Bounds b = LocalRendererBounds(box.transform);
         Vector3 size = b.size;
-        size.x = Mathf.Clamp(size.x, 0.12f, 0.55f);
-        size.y = Mathf.Clamp(size.y, 0.16f, 0.5f);
-        size.z = Mathf.Clamp(size.z, 0.12f, 0.7f);
+        size.x = Mathf.Clamp(size.x, 0.12f, 1.6f);
+        size.y = Mathf.Clamp(size.y, 0.04f, 0.8f);
+        size.z = Mathf.Clamp(size.z, 0.12f, 1.6f);
         box.center = b.center;
         box.size = size;
         box.isTrigger = false;

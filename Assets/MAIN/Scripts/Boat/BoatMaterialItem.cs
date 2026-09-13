@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 /// <summary>
 /// Доска / бревно / бочка: ЛКМ ставит деталь. Q/E — поворот, колесо — наклон, Shift — мелкий шаг.
@@ -47,6 +46,17 @@ public class BoatMaterialItem : HeldItem
     {
         _worldSize = size;
         ApplyHeldVisual();
+        ApplyWorldCollider();
+    }
+
+    void ApplyWorldCollider()
+    {
+        var box = GetComponent<BoxCollider>();
+        if (box == null)
+            box = gameObject.AddComponent<BoxCollider>();
+        box.center = Vector3.zero;
+        box.size = WorldSize;
+        box.isTrigger = false;
     }
 
     public BoatPiece TryBecomeWorldPiece()
@@ -61,6 +71,27 @@ public class BoatMaterialItem : HeldItem
         var piece = gameObject.AddComponent<BoatPiece>();
         Destroy(this);
         return piece;
+    }
+
+    static readonly Collider[] PromoteScratch = new Collider[32];
+
+    public static void PromoteAround(Vector3 point, float radius)
+    {
+        int n = Physics.OverlapSphereNonAlloc(point, radius, PromoteScratch, ~0, QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < n; i++)
+        {
+            var wood = PromoteScratch[i] != null
+                ? PromoteScratch[i].GetComponentInParent<BoatMaterialItem>()
+                : null;
+            if (wood != null && !wood.IsCarried)
+                wood.TryBecomeWorldPiece();
+        }
+    }
+
+    void Start()
+    {
+        if (!IsCarried)
+            TryBecomeWorldPiece();
     }
 
     public override bool KeepActiveInInventory => BoatRope.IsTied(transform);
@@ -83,6 +114,7 @@ public class BoatMaterialItem : HeldItem
             _worldSize = BoatVisuals.DefaultSize(kind);
 
         base.Awake();
+        ApplyWorldCollider();
         if (!_fromWorld)
             ApplyHeldVisual();
     }
@@ -127,7 +159,7 @@ public class BoatMaterialItem : HeldItem
             return;
         }
 
-        TickRotate(Time.deltaTime);
+        BoatBuildUtil.TickPlaceRotate(ref _yaw, ref _pitch, ref _roll, ref _qHeld, ref _eHeld, Time.deltaTime);
 
         if (!TryPose(out Vector3 pos, out Quaternion rot))
         {
@@ -155,84 +187,10 @@ public class BoatMaterialItem : HeldItem
         HideHeldMesh();
     }
 
-    void TickRotate(float dt)
-    {
-        var kb = Keyboard.current;
-        const float tap = 5f;
-        const float holdDelay = 0.16f;
-        const float holdDeg = 120f;
-        bool shift = kb != null && (kb.leftShiftKey.isPressed || kb.rightShiftKey.isPressed);
-        float tapStep = shift ? 2f : tap;
-        float holdSpeed = shift ? holdDeg * 0.4f : holdDeg;
-
-        if (kb != null && kb.qKey.wasPressedThisFrame)
-        {
-            _pitch -= tapStep;
-            _qHeld = 0f;
-        }
-        if (kb != null && kb.eKey.wasPressedThisFrame)
-        {
-            _pitch += tapStep;
-            _eHeld = 0f;
-        }
-        if (kb != null && kb.qKey.isPressed)
-        {
-            _qHeld += dt;
-            if (_qHeld > holdDelay)
-                _pitch -= holdSpeed * dt;
-        }
-        else
-            _qHeld = 0f;
-        if (kb != null && kb.eKey.isPressed)
-        {
-            _eHeld += dt;
-            if (_eHeld > holdDelay)
-                _pitch += holdSpeed * dt;
-        }
-        else
-            _eHeld = 0f;
-        if (kb != null && kb.rKey.wasPressedThisFrame)
-            _roll += 90f;
-
-        var mouse = Mouse.current;
-        if (mouse != null)
-        {
-            float scroll = mouse.scroll.ReadValue().y;
-            if (Mathf.Abs(scroll) > 0.01f)
-                _yaw += scroll > 0f ? tapStep : -tapStep;
-        }
-    }
-
     bool TryPose(out Vector3 pos, out Quaternion rot)
     {
-        pos = default;
         rot = _poseRot * Quaternion.Euler(_pitch, _yaw, _roll);
-        if (!BoatBuildUtil.Aim(Owner, 6f, out RaycastHit hit))
-            return false;
-
-        Vector3 size = WorldSize;
-        rot = _poseRot * Quaternion.Euler(_pitch, _yaw, _roll);
-        float lift = ProjectExtent(rot, size, Vector3.up) + 0.02f;
-        float search = Mathf.Max(0.65f, Mathf.Max(size.x, size.z) * 0.5f);
-        float y = hit.point.y;
-        if (hit.collider != null)
-        {
-            var piece = hit.collider.GetComponentInParent<BoatPiece>();
-            if (piece != null)
-                y = hit.collider.bounds.max.y;
-        }
-        if (BoatBuildUtil.TrySupportTop(hit.point, search, Owner, out float supportY) && supportY > y - 0.02f)
-            y = supportY;
-        pos = new Vector3(hit.point.x, y + lift, hit.point.z);
-        return true;
-    }
-
-    static Vector3 Abs(Vector3 v) => new Vector3(Mathf.Abs(v.x), Mathf.Abs(v.y), Mathf.Abs(v.z));
-
-    static float ProjectExtent(Quaternion rot, Vector3 size, Vector3 n)
-    {
-        Vector3 w = Abs(rot * size);
-        return 0.5f * Vector3.Dot(w, Abs(n.normalized));
+        return BoatBuildUtil.TryPlacePose(Owner, 6f, WorldSize, rot, out pos);
     }
 
     void Place(Vector3 pos, Quaternion rot)
