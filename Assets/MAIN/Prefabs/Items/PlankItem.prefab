@@ -101,7 +101,7 @@ GameObject:
   - component: {fileID: 5010929134865629203}
   - component: {fileID: 4511617518224672598}
   - component: {fileID: 7472387457525966515}
-  - component: {fileID: 2213268340053795043}
+  - component: {fileID: 8430922585476519812}
   m_Layer: 0
   m_Name: PlankItem
   m_TagString: Untagged
@@ -169,7 +169,7 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.22, y: 0.045, z: 1.15}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!54 &2213268340053795043
+--- !u!54 &8430922585476519812
 Rigidbody:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

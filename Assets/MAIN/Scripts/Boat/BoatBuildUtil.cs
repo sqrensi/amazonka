@@ -334,8 +334,179 @@ public static class BoatBuildUtil
             }
         }
         Physics.SyncTransforms();
+        UnstuckCluster(pieces);
+        NudgeClusterFromActors(pieces);
+    }
+
+    public static bool IsActorCollider(Collider col)
+    {
+        if (col == null)
+            return false;
+        return col.GetComponentInParent<CharacterController>() != null;
+    }
+
+    public static void MoveCluster(System.Collections.Generic.IList<BoatPiece> pieces, Vector3 delta)
+    {
+        if (pieces == null || delta.sqrMagnitude < 0.0000001f)
+            return;
         for (int i = 0; i < pieces.Count; i++)
-            Unstuck(pieces[i], pieces);
+        {
+            if (pieces[i] != null)
+                pieces[i].transform.position += delta;
+        }
+    }
+
+    public static void UnstuckCluster(System.Collections.Generic.IList<BoatPiece> pieces)
+    {
+        if (pieces == null || pieces.Count == 0)
+            return;
+        for (int pass = 0; pass < 6; pass++)
+        {
+            Physics.SyncTransforms();
+            Vector3 pushDir = Vector3.up;
+            float best = 0f;
+            for (int p = 0; p < pieces.Count; p++)
+            {
+                var piece = pieces[p];
+                if (piece == null)
+                    continue;
+                var box = piece.GetComponent<BoxCollider>();
+                if (box == null || !box.enabled)
+                    continue;
+                Vector3 center = piece.transform.TransformPoint(box.center);
+                Vector3 half = box.size * 0.5f;
+                int n = Physics.OverlapBoxNonAlloc(
+                    center, half, UnstuckScratch, piece.transform.rotation, ~0, QueryTriggerInteraction.Ignore);
+                for (int i = 0; i < n; i++)
+                {
+                    var col = UnstuckScratch[i];
+                    if (col == null || col == box || IsActorCollider(col))
+                        continue;
+                    if (col.transform == piece.transform || col.transform.IsChildOf(piece.transform))
+                        continue;
+                    var other = col.GetComponentInParent<BoatPiece>();
+                    if (other == piece)
+                        continue;
+                    bool sibling = false;
+                    for (int s = 0; s < pieces.Count; s++)
+                    {
+                        if (pieces[s] == other)
+                        {
+                            sibling = true;
+                            break;
+                        }
+                    }
+                    if (sibling)
+                        continue;
+                    if (!Physics.ComputePenetration(
+                            box, piece.transform.position, piece.transform.rotation,
+                            col, col.transform.position, col.transform.rotation,
+                            out Vector3 dir, out float dist)
+                        || dist < 0.0008f)
+                        continue;
+                    if (dir.y < 0.2f)
+                        dir = Vector3.up;
+                    if (dist > best)
+                    {
+                        best = dist;
+                        pushDir = dir;
+                    }
+                }
+            }
+            if (best <= 0f)
+                return;
+            MoveCluster(pieces, pushDir.normalized * (best + 0.014f));
+        }
+    }
+
+    public static void NudgeClusterFromActors(System.Collections.Generic.IList<BoatPiece> pieces)
+    {
+        if (pieces == null || pieces.Count == 0)
+            return;
+        for (int pass = 0; pass < 5; pass++)
+        {
+            Physics.SyncTransforms();
+            Vector3 push = Vector3.zero;
+            float best = 0f;
+            for (int p = 0; p < pieces.Count; p++)
+            {
+                var piece = pieces[p];
+                if (piece == null)
+                    continue;
+                var box = piece.GetComponent<BoxCollider>();
+                if (box == null || !box.enabled)
+                    continue;
+                Vector3 center = piece.transform.TransformPoint(box.center);
+                Vector3 half = box.size * 0.5f;
+                int n = Physics.OverlapBoxNonAlloc(
+                    center, half, UnstuckScratch, piece.transform.rotation, ~0, QueryTriggerInteraction.Ignore);
+                for (int i = 0; i < n; i++)
+                {
+                    var col = UnstuckScratch[i];
+                    if (col == null || col == box || !IsActorCollider(col))
+                        continue;
+                    if (!Physics.ComputePenetration(
+                            box, piece.transform.position, piece.transform.rotation,
+                            col, col.transform.position, col.transform.rotation,
+                            out Vector3 dir, out float dist)
+                        || dist < 0.0008f)
+                        continue;
+                    if (dist > best)
+                    {
+                        best = dist;
+                        push = dir;
+                    }
+                }
+            }
+            if (best <= 0f)
+                return;
+            if (push.y < -0.15f)
+                push.y = 0f;
+            if (push.sqrMagnitude < 0.0001f)
+                push = Vector3.up;
+            MoveCluster(pieces, push.normalized * (best + 0.05f));
+        }
+    }
+
+    public static void IgnoreActorsBriefly(System.Collections.Generic.IList<BoatPiece> pieces, float seconds)
+    {
+        if (pieces == null || pieces.Count == 0)
+            return;
+        BoatPiece host = null;
+        var self = new System.Collections.Generic.List<Collider>(16);
+        for (int i = 0; i < pieces.Count; i++)
+        {
+            var p = pieces[i];
+            if (p == null)
+                continue;
+            if (host == null)
+                host = p;
+            var cols = p.GetComponentsInChildren<Collider>(true);
+            for (int c = 0; c < cols.Length; c++)
+                if (cols[c] != null && cols[c].enabled)
+                    self.Add(cols[c]);
+        }
+        if (host == null || self.Count == 0)
+            return;
+
+        var actors = Object.FindObjectsByType<CharacterController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        var other = new System.Collections.Generic.List<Collider>(8);
+        for (int i = 0; i < actors.Length; i++)
+        {
+            if (actors[i] == null)
+                continue;
+            var cols = actors[i].GetComponentsInChildren<Collider>(true);
+            for (int c = 0; c < cols.Length; c++)
+                if (cols[c] != null)
+                    other.Add(cols[c]);
+        }
+        if (other.Count == 0)
+            return;
+
+        var driver = host.GetComponent<BoatIgnoreActors>();
+        if (driver == null)
+            driver = host.gameObject.AddComponent<BoatIgnoreActors>();
+        driver.Run(self.ToArray(), other.ToArray(), seconds);
     }
 
     static readonly Collider[] UnstuckScratch = new Collider[24];
@@ -360,6 +531,8 @@ public static class BoatBuildUtil
             {
                 var col = UnstuckScratch[i];
                 if (col == null || col == box)
+                    continue;
+                if (IsActorCollider(col))
                     continue;
                 if (col.transform == piece.transform || col.transform.IsChildOf(piece.transform))
                     continue;
@@ -451,5 +624,59 @@ public static class BoatBuildUtil
     {
         Vector3 w = Abs(rot * size);
         return 0.5f * Vector3.Dot(w, Abs(n.normalized));
+    }
+}
+
+class BoatIgnoreActors : MonoBehaviour
+{
+    Collider[] _self;
+    Collider[] _other;
+
+    public void Run(Collider[] self, Collider[] other, float seconds)
+    {
+        Restore();
+        _self = self;
+        _other = other;
+        SetIgnore(true);
+        StopAllCoroutines();
+        StartCoroutine(ClearAfter(seconds));
+    }
+
+    System.Collections.IEnumerator ClearAfter(float seconds)
+    {
+        yield return new WaitForSeconds(seconds);
+        Restore();
+        Destroy(this);
+    }
+
+    void OnDestroy()
+    {
+        Restore();
+    }
+
+    void Restore()
+    {
+        SetIgnore(false);
+        _self = null;
+        _other = null;
+    }
+
+    void SetIgnore(bool ignore)
+    {
+        if (_self == null || _other == null)
+            return;
+        for (int i = 0; i < _self.Length; i++)
+        {
+            var a = _self[i];
+            if (a == null)
+                continue;
+            for (int j = 0; j < _other.Length; j++)
+            {
+                var b = _other[j];
+                if (b == null)
+                    continue;
+                Physics.IgnoreCollision(a, b, ignore);
+            }
+        }
     }
 }

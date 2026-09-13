@@ -19,6 +19,8 @@ public class BoatClusterItem : HeldItem
     Quaternion _poseRot = Quaternion.identity;
     Vector3 _localSize = Vector3.one;
     readonly List<BoatPiece> _parts = new List<BoatPiece>();
+    readonly List<Vector3> _localPos = new List<Vector3>();
+    readonly List<Quaternion> _localRot = new List<Quaternion>();
     bool _released;
 
     public static bool TryPickup(List<BoatPiece> parts, PlayerInventory inv)
@@ -73,9 +75,17 @@ public class BoatClusterItem : HeldItem
     void Capture(List<BoatPiece> parts, Quaternion worldRot)
     {
         _parts.Clear();
+        _localPos.Clear();
+        _localRot.Clear();
         for (int i = 0; i < parts.Count; i++)
-            if (parts[i] != null)
-                _parts.Add(parts[i]);
+        {
+            var p = parts[i];
+            if (p == null)
+                continue;
+            _parts.Add(p);
+            _localPos.Add(p.transform.localPosition);
+            _localRot.Add(p.transform.localRotation);
+        }
         _poseRot = worldRot;
         _localSize = LocalSize();
         SetDisplayName(_parts.Count > 2 ? "Boat" : "Assembly");
@@ -237,6 +247,14 @@ public class BoatClusterItem : HeldItem
         ClearGhost();
         transform.SetParent(null, true);
         transform.SetPositionAndRotation(pos, rot);
+        for (int i = 0; i < _parts.Count && i < _localPos.Count; i++)
+        {
+            var p = _parts[i];
+            if (p == null)
+                continue;
+            p.transform.localPosition = _localPos[i];
+            p.transform.localRotation = _localRot[i];
+        }
         gameObject.SetActive(true);
 
         var pieces = new List<BoatPiece>(_parts);
@@ -263,6 +281,7 @@ public class BoatClusterItem : HeldItem
                 nails[n]?.RebuildJoint();
         }
         BoatRope.RebuildOwned(pieces);
+        BoatBuildUtil.IgnoreActorsBriefly(pieces, 1.6f);
         Physics.SyncTransforms();
 
         for (int i = 0; i < pieces.Count; i++)

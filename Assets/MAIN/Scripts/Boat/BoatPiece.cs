@@ -281,7 +281,7 @@ public class BoatPiece : MonoBehaviour, IInteractable
         _rb.detectCollisions = true;
         _rb.useGravity = true;
         _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
-        _rb.maxDepenetrationVelocity = 6f;
+        _rb.maxDepenetrationVelocity = IsLockedInBoat() ? 1.2f : 6f;
         _rb.linearVelocity = velocity;
         _rb.angularVelocity = Vector3.zero;
     }

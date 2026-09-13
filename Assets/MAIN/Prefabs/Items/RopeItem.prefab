@@ -100,8 +100,8 @@ GameObject:
   m_Component:
   - component: {fileID: 4927966793576738382}
   - component: {fileID: 3165327726080580867}
-  - component: {fileID: 875428878524103443}
-  - component: {fileID: 5920290579240274251}
+  - component: {fileID: 3020746769648852981}
+  - component: {fileID: 2296760851798649115}
   m_Layer: 0
   m_Name: RopeItem
   m_TagString: Untagged
@@ -147,7 +147,7 @@ MonoBehaviour:
   retractedEulerOffset: {x: -25, y: 0, z: 0}
   retractSmoothTime: 0.12
   useBlockThreshold: 0.5
---- !u!65 &875428878524103443
+--- !u!65 &3020746769648852981
 BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -168,7 +168,7 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.12, y: 0.24, z: 0.12}
   m_Center: {x: 0.0000000037252903, y: 0, z: -0.000000007450581}
---- !u!54 &5920290579240274251
+--- !u!54 &2296760851798649115
 Rigidbody:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

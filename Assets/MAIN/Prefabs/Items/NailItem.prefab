@@ -100,8 +100,8 @@ GameObject:
   m_Component:
   - component: {fileID: 2526696438371902919}
   - component: {fileID: 8880328386688412779}
-  - component: {fileID: 5999537030566598714}
-  - component: {fileID: 2438015826903816543}
+  - component: {fileID: 1438510904845182261}
+  - component: {fileID: 1894935364109767016}
   m_Layer: 0
   m_Name: NailItem
   m_TagString: Untagged
@@ -147,7 +147,7 @@ MonoBehaviour:
   retractedEulerOffset: {x: -25, y: 0, z: 0}
   retractSmoothTime: 0.12
   useBlockThreshold: 0.5
---- !u!65 &5999537030566598714
+--- !u!65 &1438510904845182261
 BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -168,7 +168,7 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.12, y: 0.16, z: 0.12}
   m_Center: {x: 0.0000000018626451, y: 0, z: -0.0000000037252903}
---- !u!54 &2438015826903816543
+--- !u!54 &1894935364109767016
 Rigidbody:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

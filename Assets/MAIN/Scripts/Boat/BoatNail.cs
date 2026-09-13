@@ -82,9 +82,10 @@ public class BoatNail : MonoBehaviour, IInteractable
             Destroy(_joint);
         _joint = A.gameObject.AddComponent<FixedJoint>();
         _joint.connectedBody = rbB;
-        _joint.breakForce = 14000f;
-        _joint.breakTorque = 11000f;
+        _joint.breakForce = float.PositiveInfinity;
+        _joint.breakTorque = float.PositiveInfinity;
         _joint.enableCollision = false;
+        _joint.enablePreprocessing = true;
         Driven = true;
         Hide();
     }
