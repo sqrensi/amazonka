@@ -30,7 +30,8 @@ public class HammerItem : HeldItem
             return;
         }
 
-        if (!BoatPiece.TryFindPair(hit.point, 0.48f, out BoatPiece a, out BoatPiece b))
+        var aimed = hit.collider.GetComponentInParent<BoatPiece>();
+        if (!BoatPiece.TryFindPair(hit.point, 0.28f, aimed, out BoatPiece a, out BoatPiece b))
         {
             BoatBuildHud.Hint("No nail here");
             return;
@@ -42,7 +43,7 @@ public class HammerItem : HeldItem
             return;
         }
 
-        Vector3 dir = Vector3.up;
+        Vector3 dir = hit.normal;
         nail = BoatBuildUtil.SpawnNail(a, b, hit.point, dir);
         nail.Drive();
         AddKick(new Vector3(0f, 0.015f, -0.04f), new Vector3(-12f, 0f, 2f));

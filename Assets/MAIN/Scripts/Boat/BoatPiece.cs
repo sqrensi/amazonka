@@ -31,6 +31,8 @@ public class BoatPiece : MonoBehaviour, IInteractable
 
     public string GetPrompt()
     {
+        if (CanRow())
+            return BoatOarStation.IsUsing(this) ? "Stop rowing" : "Row";
         if (!CanBeCarried())
             return "";
         CollectIsland(IslandTmp);
@@ -39,10 +41,12 @@ public class BoatPiece : MonoBehaviour, IInteractable
         return $"Pick up {KindName(kind)}";
     }
 
-    public string GetInteractKey() => "F";
+    public string GetInteractKey() => CanRow() ? "R" : "F";
 
     public Transform GetAnchor()
     {
+        if (kind == BoatPieceKind.Oar)
+            return BoatVisuals.EnsurePromptAnchor(transform, new Vector3(0f, 0.05f, pieceSize.z * 0.5f));
         CollectIsland(IslandTmp);
         if (IslandTmp.Count <= 1)
             return transform;
@@ -58,21 +62,32 @@ public class BoatPiece : MonoBehaviour, IInteractable
 
     static BoatPiece IslandLeaderFrom(List<BoatPiece> island)
     {
-        BoatPiece lead = island[0];
-        int best = lead.GetInstanceID();
-        for (int i = 1; i < island.Count; i++)
+        BoatPiece lead = null;
+        int best = int.MaxValue;
+        BoatPiece oar = null;
+        int oarBest = int.MaxValue;
+        for (int i = 0; i < island.Count; i++)
         {
             var p = island[i];
             if (p == null)
                 continue;
             int id = p.GetInstanceID();
+            if (p.kind == BoatPieceKind.Oar)
+            {
+                if (id < oarBest)
+                {
+                    oarBest = id;
+                    oar = p;
+                }
+                continue;
+            }
             if (id < best)
             {
                 best = id;
                 lead = p;
             }
         }
-        return lead;
+        return lead != null ? lead : (oar != null ? oar : island[0]);
     }
 
     Transform _promptAnchor;
@@ -111,6 +126,8 @@ public class BoatPiece : MonoBehaviour, IInteractable
     {
         if (interactor == null || !isActiveAndEnabled)
             return false;
+        if (CanRow())
+            return true;
         if (!CanBeCarried())
             return false;
         var inv = interactor.GetComponent<PlayerInventory>();
@@ -130,6 +147,53 @@ public class BoatPiece : MonoBehaviour, IInteractable
             return;
         }
         CarrySameObject(inv);
+    }
+
+    public bool TryRow(GameObject player)
+    {
+        if (kind == BoatPieceKind.Oar)
+        {
+            if (!CanRow() && !BoatOarStation.IsUsing(this))
+                return false;
+            BoatOarStation.Toggle(player, this);
+            return true;
+        }
+        CollectIsland(IslandTmp);
+        for (int i = 0; i < IslandTmp.Count; i++)
+        {
+            var oar = IslandTmp[i];
+            if (oar == null || oar == this || oar.kind != BoatPieceKind.Oar)
+                continue;
+            if (oar.TryRow(player))
+                return true;
+        }
+        return false;
+    }
+
+    public bool CanRow()
+    {
+        if (kind != BoatPieceKind.Oar || !HasDrivenNail())
+            return false;
+        if (BoatOarStation.IsUsing(this))
+            return true;
+        return IslandAfloat();
+    }
+
+    bool IslandAfloat()
+    {
+        CollectIsland(IslandTmp);
+        for (int i = 0; i < IslandTmp.Count; i++)
+        {
+            var p = IslandTmp[i];
+            if (p == null)
+                continue;
+            Vector3 pos = p.transform.position;
+            if (!BoatWater.TryHeight(pos, out float waterY))
+                continue;
+            if (pos.y < waterY + 0.9f && pos.y > waterY - 3.5f)
+                return true;
+        }
+        return false;
     }
 
     bool CanBeCarried()
@@ -162,7 +226,7 @@ public class BoatPiece : MonoBehaviour, IInteractable
     {
         kind = k;
         pieceSize = size;
-        _colCenter = Vector3.zero;
+        _colCenter = kind == BoatPieceKind.Oar ? new Vector3(0f, 0f, pieceSize.z * 0.5f) : Vector3.zero;
         ApplyVisual();
         ApplyPhysics();
     }
@@ -180,7 +244,7 @@ public class BoatPiece : MonoBehaviour, IInteractable
         {
             kind = _spawnKind;
             pieceSize = _spawnSize;
-            _colCenter = Vector3.zero;
+            _colCenter = kind == BoatPieceKind.Oar ? new Vector3(0f, 0f, pieceSize.z * 0.5f) : Vector3.zero;
             _spawnPending = false;
         }
         _rb = GetComponent<Rigidbody>();
@@ -322,6 +386,14 @@ public class BoatPiece : MonoBehaviour, IInteractable
 
     void DetachLooseNails()
     {
+        var nested = GetComponentsInChildren<BoatNail>(true);
+        for (int i = 0; i < nested.Length; i++)
+        {
+            var n = nested[i];
+            if (n == null || n.Driven)
+                continue;
+            n.DropLoose();
+        }
         for (int i = _nails.Count - 1; i >= 0; i--)
         {
             var n = _nails[i];
@@ -332,13 +404,7 @@ public class BoatPiece : MonoBehaviour, IInteractable
             }
             if (n.Driven)
                 continue;
-            if (n.A != null)
-                n.A.UnregisterNail(n);
-            if (n.B != null)
-                n.B.UnregisterNail(n);
-            n.A = null;
-            n.B = null;
-            n.transform.SetParent(null, true);
+            n.DropLoose();
         }
     }
 
@@ -422,12 +488,7 @@ public class BoatPiece : MonoBehaviour, IInteractable
     {
         axis = BoatVisuals.LengthAxis(kind);
         Vector3 size = pieceSize;
-        center = 0f;
-        if (_box != null)
-        {
-            size = _box.size;
-            center = _box.center[axis];
-        }
+        center = _colCenter[axis];
         float half = size[axis] * 0.5f;
         min = center - half;
         max = center + half;
@@ -451,13 +512,13 @@ public class BoatPiece : MonoBehaviour, IInteractable
         if (left < minRemain || right < minRemain)
             return false;
 
-        Vector3 size = _box != null ? _box.size : pieceSize;
+        Vector3 size = pieceSize;
         Vector3 leftSize = size;
         Vector3 rightSize = size;
         leftSize[axis] = left;
         rightSize[axis] = right;
 
-        Vector3 origin = _box != null ? _box.center : _colCenter;
+        Vector3 origin = _colCenter;
         Vector3 leftLocal = origin;
         Vector3 rightLocal = origin;
         leftLocal[axis] = min + left * 0.5f;
@@ -502,7 +563,7 @@ public class BoatPiece : MonoBehaviour, IInteractable
             BoatBuildUtil.SetMotion(other.Body, vel * 0.25f + along * away * 0.45f, Vector3.zero);
         }
 
-        IgnoreCollidersBrief(_box, other._box, 0.55f);
+        IgnoreCollidersBrief(BoatBuildUtil.SolidCollider(this), BoatBuildUtil.SolidCollider(other), 0.55f);
         return true;
     }
 
@@ -602,41 +663,54 @@ public class BoatPiece : MonoBehaviour, IInteractable
 
     public static bool TryFindPair(Vector3 point, float radius, out BoatPiece a, out BoatPiece b)
     {
+        return TryFindPair(point, radius, null, out a, out b);
+    }
+
+    public static bool TryFindPair(Vector3 point, float radius, BoatPiece preferred, out BoatPiece a, out BoatPiece b)
+    {
         a = null;
         b = null;
         BoatMaterialItem.PromoteAround(point, radius + 0.2f);
         int n = Physics.OverlapSphereNonAlloc(point, radius, OverlapScratch, ~0, QueryTriggerInteraction.Ignore);
-        BoatPiece best1 = null;
-        BoatPiece best2 = null;
-        float d1 = float.PositiveInfinity;
+        BoatPiece first = preferred != null && preferred.isActiveAndEnabled ? preferred : null;
+        float d1 = first != null ? 0f : float.PositiveInfinity;
+        BoatPiece second = null;
         float d2 = float.PositiveInfinity;
         for (int i = 0; i < n; i++)
         {
             var col = OverlapScratch[i];
             var p = col != null ? col.GetComponentInParent<BoatPiece>() : null;
-            if (p == null || !p.isActiveAndEnabled || p == best1)
+            if (p == null || !p.isActiveAndEnabled)
                 continue;
             if (p.GetComponentInParent<BoatClusterItem>() != null)
                 continue;
             Vector3 closest = col.ClosestPoint(point);
             float d = (closest - point).sqrMagnitude;
-            if (d < d1)
+            if (p == first)
+                continue;
+            if (first == null || (preferred == null && d < d1))
             {
-                d2 = d1;
-                best2 = best1;
+                if (first != null)
+                {
+                    second = first;
+                    d2 = d1;
+                }
+                first = p;
                 d1 = d;
-                best1 = p;
+                continue;
             }
-            else if (p != best1 && d < d2)
+            if (d < d2)
             {
                 d2 = d;
-                best2 = p;
+                second = p;
             }
         }
-        if (best1 == null || best2 == null)
+        if (first == null || second == null)
             return false;
-        a = best1;
-        b = best2;
+        if (d2 > 0.18f * 0.18f)
+            return false;
+        a = first;
+        b = second;
         return true;
     }
 
@@ -649,6 +723,11 @@ public class BoatPiece : MonoBehaviour, IInteractable
 
     void ApplyVisual()
     {
+        if (kind == BoatPieceKind.Oar)
+        {
+            BoatVisuals.BuildMountOar(transform);
+            return;
+        }
         var vis = BoatVisuals.Attach(
             transform,
             BoatVisuals.Shape(kind),
@@ -670,16 +749,36 @@ public class BoatPiece : MonoBehaviour, IInteractable
             s.y = Mathf.Max(s.y, 0.07f);
             _box.size = s;
         }
-        else if (kind == BoatPieceKind.Log)
-        {
-            Vector3 s = _box.size;
-            s.x = Mathf.Max(s.x, 0.4f);
-            s.y = Mathf.Max(s.y, 0.4f);
-            _box.size = s;
-        }
         _box.center = _colCenter;
         _box.isTrigger = false;
-        _box.enabled = true;
+        if (kind == BoatPieceKind.Log)
+        {
+            float d = Mathf.Max(pieceSize.x, pieceSize.y);
+            _box.size = new Vector3(d, d, pieceSize.z);
+            _box.enabled = true;
+            var cap = GetComponent<CapsuleCollider>();
+            if (cap != null)
+                cap.enabled = false;
+        }
+        else
+        {
+            var cap = GetComponent<CapsuleCollider>();
+            if (cap != null)
+                cap.enabled = false;
+            _box.enabled = true;
+        }
+        if (kind == BoatPieceKind.Oar)
+        {
+            var childCols = GetComponentsInChildren<BoxCollider>(true);
+            for (int i = 0; i < childCols.Length; i++)
+            {
+                if (childCols[i] == null || childCols[i] == _box)
+                    continue;
+                childCols[i].isTrigger = false;
+                childCols[i].enabled = true;
+                BoatBuildUtil.EnsureCollideWithActors(childCols[i]);
+            }
+        }
 
         _rb = GetComponent<Rigidbody>();
         if (_rb == null)
@@ -687,7 +786,9 @@ public class BoatPiece : MonoBehaviour, IInteractable
         _rb.mass = Mathf.Max(0.4f, BoatVisuals.Mass(kind) * (pieceSize.x * pieceSize.y * pieceSize.z) /
             (BoatVisuals.DefaultSize(kind).x * BoatVisuals.DefaultSize(kind).y * BoatVisuals.DefaultSize(kind).z));
         _rb.interpolation = RigidbodyInterpolation.Interpolate;
-        _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+        _rb.collisionDetectionMode = kind == BoatPieceKind.Plank || kind == BoatPieceKind.Log
+            ? CollisionDetectionMode.ContinuousDynamic
+            : CollisionDetectionMode.ContinuousSpeculative;
         _rb.linearDamping = 0.45f;
         _rb.angularDamping = 0.7f;
         _rb.maxDepenetrationVelocity = 1.8f;
@@ -706,8 +807,8 @@ public class BoatPiece : MonoBehaviour, IInteractable
             return _woodPhys;
         _woodPhys = new PhysicsMaterial("BoatWood")
         {
-            dynamicFriction = 0.72f,
-            staticFriction = 0.85f,
+            dynamicFriction = 0.88f,
+            staticFriction = 0.98f,
             bounciness = 0f,
             frictionCombine = PhysicsMaterialCombine.Maximum,
             bounceCombine = PhysicsMaterialCombine.Minimum
@@ -721,6 +822,7 @@ public class BoatPiece : MonoBehaviour, IInteractable
         {
             case BoatPieceKind.Log: return "Log";
             case BoatPieceKind.Barrel: return "Barrel";
+            case BoatPieceKind.Oar: return "Oar";
             default: return "Plank";
         }
     }

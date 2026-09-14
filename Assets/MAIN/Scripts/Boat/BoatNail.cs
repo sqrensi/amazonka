@@ -8,6 +8,7 @@ public class BoatNail : MonoBehaviour, IInteractable
 {
     public BoatPiece A;
     public BoatPiece B;
+    public Vector3 Aim;
     public bool Driven;
     FixedJoint _joint;
 
@@ -69,6 +70,54 @@ public class BoatNail : MonoBehaviour, IInteractable
         }
     }
 
+    public void DropLoose()
+    {
+        DisconnectJointKeepState();
+        if (A != null)
+            A.UnregisterNail(this);
+        if (B != null)
+            B.UnregisterNail(this);
+        A = null;
+        B = null;
+        Driven = false;
+
+        transform.SetParent(null, true);
+        gameObject.SetActive(true);
+
+        var renderers = GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+            if (renderers[i] != null)
+                renderers[i].enabled = true;
+
+        var cols = GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < cols.Length; i++)
+        {
+            if (cols[i] == null)
+                continue;
+            cols[i].isTrigger = false;
+            cols[i].enabled = true;
+        }
+
+        var rb = GetComponent<Rigidbody>();
+        if (rb == null)
+            rb = gameObject.AddComponent<Rigidbody>();
+        rb.isKinematic = false;
+        rb.useGravity = true;
+        rb.detectCollisions = true;
+        rb.mass = 0.08f;
+        rb.linearDamping = 0.2f;
+        rb.angularDamping = 0.4f;
+        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+        BoatBuildUtil.StopMotion(rb);
+        rb.AddForce(Vector3.down * 0.4f, ForceMode.VelocityChange);
+
+        Destroy(this);
+        var item = gameObject.GetComponent<NailItem>();
+        if (item == null)
+            item = gameObject.AddComponent<NailItem>();
+        item.SetDisplayName("Nail");
+    }
+
     public void Drive()
     {
         if (Driven || A == null || B == null)
@@ -80,11 +129,18 @@ public class BoatNail : MonoBehaviour, IInteractable
 
         if (_joint != null)
             Destroy(_joint);
+
+        BoatBuildUtil.SnapTogether(A, B, Aim);
+        if (rbA != null)
+            BoatBuildUtil.StopMotion(rbA);
+        if (rbB != null)
+            BoatBuildUtil.StopMotion(rbB);
+
         _joint = A.gameObject.AddComponent<FixedJoint>();
         _joint.connectedBody = rbB;
         _joint.breakForce = float.PositiveInfinity;
         _joint.breakTorque = float.PositiveInfinity;
-        _joint.enableCollision = false;
+        _joint.enableCollision = true;
         _joint.enablePreprocessing = true;
         Driven = true;
         Hide();

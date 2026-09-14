@@ -20,12 +20,13 @@ public class NailItem : HeldItem
             BoatBuildHud.Hint("Aim at a joint");
             return;
         }
-        if (!BoatPiece.TryFindPair(hit.point, 0.48f, out BoatPiece a, out BoatPiece b))
+        var aimed = hit.collider.GetComponentInParent<BoatPiece>();
+        if (!BoatPiece.TryFindPair(hit.point, 0.28f, aimed, out BoatPiece a, out BoatPiece b))
         {
             BoatBuildHud.Hint("Need two pieces touching");
             return;
         }
-        Vector3 dir = Vector3.up;
+        Vector3 dir = hit.normal;
         BoatBuildUtil.SpawnNail(a, b, hit.point, dir);
         Inventory?.DestroyEquipped();
         BoatBuildHud.Hint("Hammer the nail");

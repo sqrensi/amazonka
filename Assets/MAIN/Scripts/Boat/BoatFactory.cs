@@ -8,12 +8,15 @@ public static class BoatFactory
     public static BoatMaterialItem CreateMaterial(BoatPieceKind kind)
     {
         var go = new GameObject(kind + "Item");
-        BoatVisuals.Attach(
-            go.transform,
-            BoatVisuals.Shape(kind),
-            BoatVisuals.VisualScale(kind, BoatVisuals.DefaultSize(kind)),
-            BoatVisuals.VisualRotation(kind),
-            BoatVisuals.MaterialFor(kind));
+        if (kind == BoatPieceKind.Oar)
+            BoatVisuals.BuildMountOar(go.transform);
+        else
+            BoatVisuals.Attach(
+                go.transform,
+                BoatVisuals.Shape(kind),
+                BoatVisuals.VisualScale(kind, BoatVisuals.DefaultSize(kind)),
+                BoatVisuals.VisualRotation(kind),
+                BoatVisuals.MaterialFor(kind));
         var item = go.AddComponent<BoatMaterialItem>();
         item.SetKind(kind);
         item.SetWorldSize(BoatVisuals.DefaultSize(kind));
@@ -48,6 +51,13 @@ public static class BoatFactory
         return go.AddComponent<SawItem>();
     }
 
+    public static OarItem CreateHandOar()
+    {
+        var go = new GameObject("HandOarItem");
+        BoatVisuals.BuildHandOar(go.transform);
+        return go.AddComponent<OarItem>();
+    }
+
     public static HeldItem Create(string id)
     {
         switch (id)
@@ -58,6 +68,8 @@ public static class BoatFactory
             case "Rope": return CreateRope();
             case "Hammer": return CreateHammer();
             case "Saw": return CreateSaw();
+            case "Oar": return CreateMaterial(BoatPieceKind.Oar);
+            case "HandOar": return CreateHandOar();
             default: return CreateMaterial(BoatPieceKind.Plank);
         }
     }

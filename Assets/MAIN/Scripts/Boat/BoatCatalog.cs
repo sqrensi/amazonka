@@ -12,6 +12,8 @@ public static class BoatCatalog
     public static RopeItem Rope;
     public static HammerItem Hammer;
     public static SawItem Saw;
+    public static BoatMaterialItem Oar;
+    public static OarItem HandOar;
 
     public static BoatMaterialItem ItemPrefab(BoatPieceKind kind)
     {
@@ -19,6 +21,7 @@ public static class BoatCatalog
         {
             case BoatPieceKind.Log: return Log;
             case BoatPieceKind.Barrel: return Barrel;
+            case BoatPieceKind.Oar: return Oar;
             default: return Plank;
         }
     }

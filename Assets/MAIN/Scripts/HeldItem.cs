@@ -82,9 +82,9 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
     /// <summary>Предмет достаточно убран у стены — использование заблокировано.</summary>
     public bool IsUseBlocked => !IsEquipped || _retract >= useBlockThreshold;
 
-    public string GetPrompt() => $"Pickup {displayName}";
-    public Transform GetAnchor() => transform;
-    public string GetInteractKey() => "F";
+    public virtual string GetPrompt() => $"Pickup {displayName}";
+    public virtual Transform GetAnchor() => transform;
+    public virtual string GetInteractKey() => "F";
 
     public bool CanInteract(GameObject interactor)
     {
@@ -122,7 +122,7 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
     }
 
     /// <summary>Применить позу в руке с учётом текущей убранности (retract).</summary>
-    public void ApplyHeldPose()
+    public virtual void ApplyHeldPose()
     {
         float hide = 1f - _equip;
         Vector3 equipOffset = new Vector3(0.02f, -0.07f, -0.05f) * hide;
@@ -312,18 +312,19 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
 
         _swayPos = Vector3.SmoothDamp(_swayPos, posTarget, ref _swayPosVel, 0.11f, 2f, dt);
         _swayEuler = Vector3.SmoothDamp(_swayEuler, eulerTarget, ref _swayEulerVel, 0.13f, 80f, dt);
-        _kickPos = Vector3.SmoothDamp(_kickPos, Vector3.zero, ref _kickPosVel, 0.07f, 8f, dt);
-        _kickEuler = Vector3.SmoothDamp(_kickEuler, Vector3.zero, ref _kickEulerVel, 0.08f, 120f, dt);
+        _kickPos = Vector3.SmoothDamp(_kickPos, Vector3.zero, ref _kickPosVel, KickPosSmooth, KickPosMaxSpeed, dt);
+        _kickEuler = Vector3.SmoothDamp(_kickEuler, Vector3.zero, ref _kickEulerVel, KickEulerSmooth, KickEulerMaxSpeed, dt);
     }
 
-    void SetRenderersHidden(bool hidden)
-    {
-        if (_hidden == hidden)
-            return;
-        _hidden = hidden;
+    protected virtual float KickPosSmooth => 0.07f;
+    protected virtual float KickPosMaxSpeed => 8f;
+    protected virtual float KickEulerSmooth => 0.08f;
+    protected virtual float KickEulerMaxSpeed => 120f;
 
-        if (_renderers == null)
-            _renderers = GetComponentsInChildren<Renderer>(true);
+    protected void SetRenderersHidden(bool hidden)
+    {
+        _hidden = hidden;
+        _renderers = GetComponentsInChildren<Renderer>(true);
         foreach (var r in _renderers)
             if (r != null)
                 r.enabled = !hidden;

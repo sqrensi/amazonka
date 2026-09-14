@@ -34,6 +34,15 @@ public class PlayerInteractor : MonoBehaviour
     void Update()
     {
         RefreshTarget();
+        var kb = Keyboard.current;
+        if (kb != null && kb.rKey.wasPressedThisFrame)
+            TryRow();
+    }
+
+    void TryRow()
+    {
+        if (_current is BoatPiece piece)
+            piece.TryRow(gameObject);
     }
 
     void RefreshTarget()
@@ -114,6 +123,12 @@ public class PlayerInteractor : MonoBehaviour
         resolvedComp = component;
         if (interactable is BoatPiece piece)
         {
+            if (piece.CanRow())
+            {
+                resolved = piece;
+                resolvedComp = piece;
+                return;
+            }
             var lead = piece.IslandLeader();
             if (lead != null)
             {

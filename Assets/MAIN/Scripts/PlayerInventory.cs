@@ -438,7 +438,11 @@ public class PlayerInventory : MonoBehaviour
             return;
 
         if (value.isPressed)
+        {
+            if (BoatOarStation.Active != null)
+                return;
             Current?.OnUseStart();
+        }
         else
             Current?.OnUseStop();
     }

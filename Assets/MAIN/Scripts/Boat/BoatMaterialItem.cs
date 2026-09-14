@@ -31,6 +31,13 @@ public class BoatMaterialItem : HeldItem
     public BoatPieceKind Kind => kind;
     public Vector3 WorldSize => _worldSize.sqrMagnitude > 0.01f ? _worldSize : BoatVisuals.DefaultSize(kind);
 
+    public override Transform GetAnchor()
+    {
+        if (kind == BoatPieceKind.Oar)
+            return BoatVisuals.EnsurePromptAnchor(transform, new Vector3(0f, 0.05f, WorldSize.z * 0.5f));
+        return transform;
+    }
+
     public static void BeginCarry(BoatPieceKind k, Vector3 size, string displayName, Quaternion worldRot)
     {
         _pendingCarry = true;
@@ -54,8 +61,8 @@ public class BoatMaterialItem : HeldItem
         var box = GetComponent<BoxCollider>();
         if (box == null)
             box = gameObject.AddComponent<BoxCollider>();
-        box.center = Vector3.zero;
         box.size = WorldSize;
+        box.center = kind == BoatPieceKind.Oar ? new Vector3(0f, 0f, WorldSize.z * 0.5f) : Vector3.zero;
         box.isTrigger = false;
     }
 
@@ -122,9 +129,11 @@ public class BoatMaterialItem : HeldItem
     public override void OnEquip()
     {
         base.OnEquip();
-        HideHeldMesh();
+        SetRenderersHidden(true);
         _ghostFollow = false;
         BoatBuildHud.Hint("LMB place   Wheel yaw   Shift+Wheel roll   hold Q/E tilt   G drop", 4f);
+        if (kind == BoatPieceKind.Oar)
+            BoatBuildHud.Hint("LMB place   nail to hull   R to use on water", 4f);
     }
 
     public override void OnUnequip()
@@ -136,14 +145,14 @@ public class BoatMaterialItem : HeldItem
 
     protected override void OnRetractChanged(float retract)
     {
-        HideHeldMesh();
+        SetRenderersHidden(true);
     }
 
     public override void OnUseStart()
     {
         if (IsUseBlocked)
             return;
-        if (!TryPose(out Vector3 pos, out Quaternion rot))
+        if (!TryPose(out Vector3 pos, out Quaternion rot, out _))
         {
             BoatBuildHud.Hint("Aim at ground or a piece");
             return;
@@ -161,12 +170,12 @@ public class BoatMaterialItem : HeldItem
 
         BoatBuildUtil.TickPlaceRotate(ref _yaw, ref _pitch, ref _roll, ref _qHeld, ref _eHeld, Time.deltaTime);
 
-        if (!TryPose(out Vector3 pos, out Quaternion rot))
+        if (!TryPose(out Vector3 pos, out Quaternion rot, out _))
         {
             if (_ghost != null)
                 _ghost.SetActive(false);
             _ghostFollow = false;
-            HideHeldMesh();
+            SetRenderersHidden(true);
             return;
         }
         EnsureGhost();
@@ -180,17 +189,25 @@ public class BoatMaterialItem : HeldItem
         }
         else
         {
-            _ghostPos = Vector3.SmoothDamp(_ghostPos, pos, ref _ghostPosVel, 0.055f, 28f, Time.deltaTime);
-            _ghostRot = Quaternion.Slerp(_ghostRot, rot, 1f - Mathf.Exp(-18f * Time.deltaTime));
+            _ghostPos = Vector3.SmoothDamp(_ghostPos, pos, ref _ghostPosVel, 0.07f, 6f, Time.deltaTime);
+            _ghostRot = Quaternion.Slerp(_ghostRot, rot, 1f - Mathf.Exp(-10f * Time.deltaTime));
         }
         _ghost.transform.SetPositionAndRotation(_ghostPos, _ghostRot);
-        HideHeldMesh();
+        SetRenderersHidden(true);
     }
 
-    bool TryPose(out Vector3 pos, out Quaternion rot)
+    bool TryPose(out Vector3 pos, out Quaternion rot, out float supportY)
     {
         rot = _poseRot * Quaternion.Euler(_pitch, _yaw, _roll);
-        return BoatBuildUtil.TryPlacePose(Owner, 6f, WorldSize, rot, out pos);
+        BoatVisuals.PlaceBox(kind, WorldSize, out Vector3 center, out Vector3 box);
+        if (!BoatBuildUtil.TryPlacePose(Owner, 6f, box, center, rot, out pos, spanNeighbors: kind != BoatPieceKind.Oar))
+        {
+            supportY = 0f;
+            return false;
+        }
+        Vector3 worldC = pos + rot * center;
+        supportY = worldC.y - BoatBuildUtil.ProjectExtent(rot, box, Vector3.up);
+        return true;
     }
 
     void Place(Vector3 pos, Quaternion rot)
@@ -215,6 +232,8 @@ public class BoatMaterialItem : HeldItem
             gameObject.SetActive(true);
             var live = gameObject.AddComponent<BoatPiece>();
             live.Configure(kind, WorldSize);
+            SetRenderersHidden(false);
+            BoatBuildUtil.ClearIgnoreWithBoat(live);
             BoatBuildUtil.Settle(live, support);
             Destroy(this);
             return;
@@ -222,8 +241,10 @@ public class BoatMaterialItem : HeldItem
 
         var go = new GameObject(kind + "Piece");
         go.transform.SetPositionAndRotation(pos, rot);
+        BoatPiece.PrepareSpawn(kind, WorldSize);
         var piece = go.AddComponent<BoatPiece>();
         piece.Configure(kind, WorldSize);
+        BoatBuildUtil.ClearIgnoreWithBoat(piece);
         BoatBuildUtil.Settle(piece, support);
         if (Inventory != null)
             Inventory.DestroyEquipped();
@@ -262,6 +283,11 @@ public class BoatMaterialItem : HeldItem
 
     void ApplyHeldVisual()
     {
+        if (kind == BoatPieceKind.Oar)
+        {
+            BoatVisuals.BuildMountOar(transform);
+            return;
+        }
         BoatVisuals.Attach(
             transform,
             BoatVisuals.Shape(kind),
@@ -279,30 +305,20 @@ public class BoatMaterialItem : HeldItem
             return;
         _ghost = new GameObject("Ghost");
         _ghostSize = size;
-        BoatVisuals.Attach(
-            _ghost.transform,
-            BoatVisuals.Shape(kind),
-            BoatVisuals.VisualScale(kind, size),
-            BoatVisuals.VisualRotation(kind),
-            BoatVisuals.Ghost);
+        if (kind == BoatPieceKind.Oar)
+            BoatVisuals.CopyOarVisual(transform, _ghost.transform, BoatVisuals.Ghost);
+        else
+            BoatVisuals.Attach(
+                _ghost.transform,
+                BoatVisuals.Shape(kind),
+                BoatVisuals.VisualScale(kind, size),
+                BoatVisuals.VisualRotation(kind),
+                BoatVisuals.Ghost);
         BoatVisuals.SetIgnoreRaycast(_ghost);
         var col = _ghost.GetComponent<Collider>();
         if (col != null)
             Object.Destroy(col);
         _ghost.SetActive(false);
-    }
-
-    void HideHeldMesh()
-    {
-        var rs = GetComponentsInChildren<Renderer>(true);
-        for (int i = 0; i < rs.Length; i++)
-        {
-            if (rs[i] == null)
-                continue;
-            if (_ghost != null && rs[i].transform.IsChildOf(_ghost.transform))
-                continue;
-            rs[i].enabled = false;
-        }
     }
 
     void ClearGhost()

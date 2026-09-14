@@ -67,6 +67,7 @@ public static class BoatVisuals
         {
             case BoatPieceKind.Log: return new Vector3(0.28f, 0.28f, 1.45f);
             case BoatPieceKind.Barrel: return new Vector3(0.5f, 0.62f, 0.5f);
+            case BoatPieceKind.Oar: return new Vector3(0.2f, 0.14f, 2.05f);
             default: return new Vector3(0.22f, 0.045f, 1.15f);
         }
     }
@@ -77,6 +78,7 @@ public static class BoatVisuals
         {
             case BoatPieceKind.Log: return 6.5f;
             case BoatPieceKind.Barrel: return 8f;
+            case BoatPieceKind.Oar: return 1.8f;
             default: return 2.2f;
         }
     }
@@ -87,6 +89,7 @@ public static class BoatVisuals
         {
             case BoatPieceKind.Barrel: return 52f;
             case BoatPieceKind.Log: return 38f;
+            case BoatPieceKind.Oar: return 12f;
             default: return 30f;
         }
     }
@@ -107,6 +110,7 @@ public static class BoatVisuals
         {
             case BoatPieceKind.Log: return WoodDark;
             case BoatPieceKind.Barrel: return Barrel;
+            case BoatPieceKind.Oar: return WoodDark;
             default: return Wood;
         }
     }
@@ -129,6 +133,18 @@ public static class BoatVisuals
         return kind == BoatPieceKind.Log ? Quaternion.Euler(90f, 0f, 0f) : Quaternion.identity;
     }
 
+    public static void PlaceBox(BoatPieceKind kind, Vector3 size, out Vector3 center, out Vector3 box)
+    {
+        if (kind == BoatPieceKind.Oar)
+        {
+            center = new Vector3(0f, 0f, size.z * 0.5f);
+            box = new Vector3(0.2f, 0.16f, size.z);
+            return;
+        }
+        center = Vector3.zero;
+        box = size;
+    }
+
     /// <summary>Дочерний примитив Unity без своего коллайдера.</summary>
     public static GameObject Attach(Transform parent, PrimitiveType type, Vector3 localScale, Material mat, string name = "Vis")
     {
@@ -142,9 +158,27 @@ public static class BoatVisuals
         Transform old = parent.Find(name);
         while (old != null)
         {
-            Object.DestroyImmediate(old.gameObject);
+            GameObject go = old.gameObject;
+            go.name = name + "_old";
+            if (IsPrefabInstancePart(go))
+                go.SetActive(false);
+            else if (!Application.isPlaying)
+                Object.DestroyImmediate(go);
+            else
+                Object.Destroy(go);
             old = parent.Find(name);
         }
+    }
+
+    static bool IsPrefabInstancePart(Object obj)
+    {
+        if (obj == null)
+            return false;
+#if UNITY_EDITOR
+        return PrefabUtility.IsPartOfNonAssetPrefabInstance(obj);
+#else
+        return false;
+#endif
     }
 
     public static GameObject Attach(Transform parent, PrimitiveType type, Vector3 localScale, Quaternion localRot, Material mat, string name = "Vis")
@@ -330,5 +364,151 @@ public static class BoatVisuals
 
         var ferrule = Attach(root, PrimitiveType.Cube, new Vector3(0.042f, 0.028f, 0.04f), Metal, "Ferrule");
         ferrule.transform.localPosition = new Vector3(0f, 0.02f, -0.08f);
+    }
+
+    public static void BuildOar(Transform root, Material shaftMat = null, Material bladeMat = null)
+    {
+        BuildMountOar(root, shaftMat, bladeMat);
+    }
+
+    public static void BuildHandOar(Transform root, Material shaftMat = null, Material bladeMat = null)
+    {
+        if (root == null)
+            return;
+        DisableNamed(root, "Vis");
+        DisableNamed(root, "Vis_old");
+        ClearOarParts(root);
+        if (shaftMat == null)
+            shaftMat = WoodDark;
+        if (bladeMat == null)
+            bladeMat = Wood;
+        var shaft = Attach(root, PrimitiveType.Cylinder, new Vector3(0.032f, 0.96f, 0.032f), Quaternion.Euler(90f, 0f, 0f), shaftMat, "Shaft");
+        shaft.transform.localPosition = new Vector3(0f, 0f, 0.98f);
+        var neck = Attach(root, PrimitiveType.Cube, new Vector3(0.05f, 0.034f, 0.16f), shaftMat, "Neck");
+        neck.transform.localPosition = new Vector3(0f, 0f, 1.72f);
+        var blade = Attach(root, PrimitiveType.Cube, new Vector3(0.17f, 0.02f, 0.38f), bladeMat, "Blade");
+        blade.transform.localPosition = new Vector3(0f, 0f, 1.86f);
+        var grip = Attach(root, PrimitiveType.Cube, new Vector3(0.13f, 0.034f, 0.05f), shaftMat, "Handle");
+        grip.transform.localPosition = new Vector3(0f, 0f, 0.06f);
+        var cap = Attach(root, PrimitiveType.Cylinder, new Vector3(0.036f, 0.028f, 0.036f), Quaternion.Euler(90f, 0f, 0f), shaftMat, "HandleCap");
+        cap.transform.localPosition = new Vector3(0f, 0f, 0.03f);
+        EnableRenderers(root);
+    }
+
+    public static void BuildMountOar(Transform root, Material shaftMat = null, Material bladeMat = null)
+    {
+        if (root == null)
+            return;
+        DisableNamed(root, "Vis");
+        DisableNamed(root, "Vis_old");
+        ClearOarParts(root);
+        if (shaftMat == null)
+            shaftMat = WoodDark;
+        if (bladeMat == null)
+            bladeMat = Wood;
+        var shaft = Attach(root, PrimitiveType.Cylinder, new Vector3(0.048f, 0.94f, 0.048f), Quaternion.Euler(90f, 0f, 0f), shaftMat, "Shaft");
+        shaft.transform.localPosition = new Vector3(0f, 0f, 0.96f);
+        var neck = Attach(root, PrimitiveType.Cube, new Vector3(0.09f, 0.05f, 0.18f), shaftMat, "Neck");
+        neck.transform.localPosition = new Vector3(0f, 0f, 1.68f);
+        var collar = Attach(root, PrimitiveType.Cube, new Vector3(0.1f, 0.045f, 0.08f), Metal, "Collar");
+        collar.transform.localPosition = new Vector3(0f, 0f, 1.76f);
+        var blade = Attach(root, PrimitiveType.Cube, new Vector3(0.36f, 0.034f, 0.52f), bladeMat, "Blade");
+        blade.transform.localPosition = new Vector3(0f, 0f, 1.88f);
+        var post = Attach(root, PrimitiveType.Cube, new Vector3(0.06f, 0.3f, 0.06f), WoodDark, "OarlockPost");
+        post.transform.localPosition = new Vector3(0f, -0.14f, 0.2f);
+        AddFitBox(post);
+        var plate = Attach(root, PrimitiveType.Cube, new Vector3(0.16f, 0.035f, 0.12f), Metal, "OarlockPlate");
+        plate.transform.localPosition = new Vector3(0f, -0.3f, 0.2f);
+        AddFitBox(plate);
+        var forkL = Attach(root, PrimitiveType.Cube, new Vector3(0.03f, 0.12f, 0.04f), Metal, "OarlockForkL");
+        forkL.transform.localPosition = new Vector3(-0.05f, 0.06f, 0.2f);
+        AddFitBox(forkL);
+        var forkR = Attach(root, PrimitiveType.Cube, new Vector3(0.03f, 0.12f, 0.04f), Metal, "OarlockForkR");
+        forkR.transform.localPosition = new Vector3(0.05f, 0.06f, 0.2f);
+        AddFitBox(forkR);
+        var pin = Attach(root, PrimitiveType.Cylinder, new Vector3(0.014f, 0.07f, 0.014f), Quaternion.Euler(0f, 0f, 90f), Metal, "OarlockPin");
+        pin.transform.localPosition = new Vector3(0f, 0.1f, 0.2f);
+        AddFitBox(pin);
+        EnableRenderers(root);
+    }
+
+    public static Transform EnsurePromptAnchor(Transform root, Vector3 localPos)
+    {
+        if (root == null)
+            return null;
+        Transform t = root.Find("PromptAnchor");
+        if (t == null)
+        {
+            var go = new GameObject("PromptAnchor");
+            t = go.transform;
+            t.SetParent(root, false);
+        }
+        t.localPosition = localPos;
+        t.localRotation = Quaternion.identity;
+        t.localScale = Vector3.one;
+        return t;
+    }
+
+    public static void CopyOarVisual(Transform src, Transform dst, Material mat)
+    {
+        if (src == null || dst == null)
+            return;
+        BuildMountOar(dst, mat, mat);
+        var rs = dst.GetComponentsInChildren<Renderer>(true);
+        for (int r = 0; r < rs.Length; r++)
+        {
+            if (rs[r] == null)
+                continue;
+            rs[r].enabled = true;
+            if (mat != null)
+                rs[r].sharedMaterial = mat;
+        }
+        var cols = dst.GetComponentsInChildren<Collider>(true);
+        for (int c = 0; c < cols.Length; c++)
+        {
+            if (cols[c] != null)
+                Object.Destroy(cols[c]);
+        }
+    }
+
+    static void ClearOarParts(Transform root)
+    {
+        string[] names =
+        {
+            "Shaft", "Neck", "Blade", "Collar", "Handle", "HandleCap",
+            "OarlockPost", "OarlockPlate", "OarlockForkL", "OarlockForkR", "OarlockPin"
+        };
+        for (int i = 0; i < names.Length; i++)
+            ClearChild(root, names[i]);
+    }
+
+    static void AddFitBox(GameObject go)
+    {
+        if (go == null || go.GetComponent<BoxCollider>() != null)
+            return;
+        var box = go.AddComponent<BoxCollider>();
+        box.size = Vector3.one;
+        box.center = Vector3.zero;
+        box.isTrigger = false;
+        BoatBuildUtil.EnsureCollideWithActors(box);
+    }
+
+    static void DisableNamed(Transform root, string name)
+    {
+        Transform t = root.Find(name);
+        if (t != null)
+            t.gameObject.SetActive(false);
+    }
+
+    static void EnableRenderers(Transform root)
+    {
+        if (root == null)
+            return;
+        var rs = root.GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < rs.Length; i++)
+        {
+            if (rs[i] != null)
+                rs[i].enabled = true;
+        }
     }
 }

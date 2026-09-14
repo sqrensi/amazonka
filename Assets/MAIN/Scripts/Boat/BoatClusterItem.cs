@@ -195,8 +195,8 @@ public class BoatClusterItem : HeldItem
         }
         else
         {
-            _ghostPos = Vector3.SmoothDamp(_ghostPos, pos, ref _ghostPosVel, 0.055f, 28f, Time.deltaTime);
-            _ghostRot = Quaternion.Slerp(_ghostRot, rot, 1f - Mathf.Exp(-18f * Time.deltaTime));
+            _ghostPos = Vector3.SmoothDamp(_ghostPos, pos, ref _ghostPosVel, 0.08f, 5f, Time.deltaTime);
+            _ghostRot = Quaternion.Slerp(_ghostRot, rot, 1f - Mathf.Exp(-9f * Time.deltaTime));
         }
         _ghost.transform.SetPositionAndRotation(_ghostPos, _ghostRot);
         HideHeldMesh();

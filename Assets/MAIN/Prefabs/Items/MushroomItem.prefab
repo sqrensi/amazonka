@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1 &6428771175199679977
+--- !u!1 &2188688485527423337
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -8,10 +8,10 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 5047042514031914651}
-  - component: {fileID: 8273732819137623287}
-  - component: {fileID: 2358233805776887260}
-  - component: {fileID: 87273585962472896}
+  - component: {fileID: 6038214898632124029}
+  - component: {fileID: 4470700380375894566}
+  - component: {fileID: 1593787492794927735}
+  - component: {fileID: 3251330850293002449}
   m_Layer: 0
   m_Name: MushroomItem
   m_TagString: Untagged
@@ -19,13 +19,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &5047042514031914651
+--- !u!4 &6038214898632124029
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6428771175199679977}
+  m_GameObject: {fileID: 2188688485527423337}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -34,13 +34,13 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &8273732819137623287
+--- !u!114 &4470700380375894566
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6428771175199679977}
+  m_GameObject: {fileID: 2188688485527423337}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7e4c9a12b8d64f3a9f01c5e6a2b8d470, type: 3}
@@ -52,17 +52,17 @@ MonoBehaviour:
   heldLocalPosition: {x: 0.04, y: -0.06, z: 0.1}
   heldLocalEuler: {x: -12, y: 22, z: 8}
   heldLocalScale: {x: 0.55, y: 0.55, z: 0.55}
-  retractedPositionOffset: {x: 0, y: 0.06, z: -0.28}
-  retractedEulerOffset: {x: -25, y: 0, z: 0}
-  retractSmoothTime: 0.12
-  useBlockThreshold: 0.5
---- !u!65 &2358233805776887260
+  retractedPositionOffset: {x: 0.015, y: -0.035, z: -0.2}
+  retractedEulerOffset: {x: -10, y: 6, z: -8}
+  retractSmoothTime: 0.42
+  useBlockThreshold: 0.82
+--- !u!65 &1593787492794927735
 BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6428771175199679977}
+  m_GameObject: {fileID: 2188688485527423337}
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
@@ -77,13 +77,13 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.3, y: 0.3, z: 0.3}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!54 &87273585962472896
+--- !u!54 &3251330850293002449
 Rigidbody:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6428771175199679977}
+  m_GameObject: {fileID: 2188688485527423337}
   serializedVersion: 5
   m_Mass: 1.35
   m_LinearDamping: 0.55

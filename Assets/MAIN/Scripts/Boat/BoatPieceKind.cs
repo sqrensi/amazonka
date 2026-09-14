@@ -2,5 +2,6 @@ public enum BoatPieceKind
 {
     Plank,
     Log,
-    Barrel
+    Barrel,
+    Oar
 }
