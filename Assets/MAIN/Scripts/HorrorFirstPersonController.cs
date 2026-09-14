@@ -105,6 +105,10 @@ public class HorrorFirstPersonController : MonoBehaviour
     bool _strideStarted;
     bool _jumpedThisAir;
     float _defaultStepOffset = 0.3f;
+    float _heaveLockUntil;
+    bool _heaving;
+    bool _wasAtSwimSurface;
+    Vector3 _swimVel;
     int _lastFootstepIndex = -1;
     Vector3 _camPosVelocity;
     float _camRoll;
@@ -125,8 +129,10 @@ public class HorrorFirstPersonController : MonoBehaviour
     float _stepPunchVel;
     float _landOffsetVel;
     float _bobWeight;
+    float _coyoteTime;
+    float _swimBobTime;
     float _airAudioTime;
-    readonly Collider[] _groundOverlap = new Collider[16];
+    readonly Collider[] _groundOverlap = new Collider[32];
 
     public float StaminaNormalized =>
         !useStamina || maxStamina <= 0f ? 1f : _stamina / maxStamina;
@@ -151,6 +157,7 @@ public class HorrorFirstPersonController : MonoBehaviour
     void Awake()
     {
         _controller = GetComponent<CharacterController>();
+        _controller.enableOverlapRecovery = true;
         _defaultStepOffset = _controller.stepOffset;
         _playerInput = GetComponent<PlayerInput>();
         if (_playerInput != null && _playerInput.actions != null)
@@ -312,23 +319,31 @@ public class HorrorFirstPersonController : MonoBehaviour
             return;
         }
 
+        bool grounded = IsOnWalkableGround();
+        bool overWater = BoatWater.TryHeight(transform.position, out float waterY);
+        float feetY = transform.position.y;
+        float camLocalY = cameraPivot != null ? cameraPivot.localPosition.y : standingCameraHeight;
+        float floatFeet = waterY - camLocalY + 0.32f;
+        bool inWater = overWater && waterY > feetY + 0.06f;
+        bool wasSwimming = IsSwimming;
+        bool swimming = overWater && !grounded &&
+            (feetY < waterY - 0.06f || _heaving || (wasSwimming && feetY < waterY + 0.9f && !_jumpedThisAir));
+        IsSwimming = swimming;
+        float ledgeY = 0f;
         Vector3 planar = transform.right * _moveInput.x + transform.forward * _moveInput.y;
         if (planar.sqrMagnitude > 1f)
             planar.Normalize();
-
-        // Свой probe, а не CC.isGrounded: у дома из брёвен боковой контакт
-        // даёт ложный grounded и "присасывает" к стене в прыжке.
-        bool grounded = IsOnWalkableGround();
-        bool overWater = BoatWater.TryHeight(transform.position, out float waterY);
-        bool inWater = overWater && waterY > transform.position.y + 0.16f;
-        bool swimming = inWater && !grounded;
-        IsSwimming = swimming;
-        float ledgeY = 0f;
-        bool climbingOut = swimming && TryFindWaterExit(planar, waterY, out ledgeY);
-        _controller.stepOffset = !swimming || climbingOut ? Mathf.Max(_defaultStepOffset, climbingOut ? 0.65f : _defaultStepOffset) : 0f;
+        bool nearLedge = swimming && TryFindWaterExit(planar.sqrMagnitude > 0.04f ? planar : transform.forward, waterY, out ledgeY);
+        _controller.stepOffset = !swimming || _heaving || nearLedge
+            ? Mathf.Max(_defaultStepOffset, (_heaving || nearLedge) ? 0.62f : _defaultStepOffset)
+            : 0f;
 
         if (grounded)
         {
+            _heaving = false;
+            _swimVel = Vector3.zero;
+            _wasAtSwimSurface = false;
+            _coyoteTime = 0.14f;
             if (!_wasGrounded)
             {
                 _landOffset = -landBob;
@@ -338,7 +353,10 @@ public class HorrorFirstPersonController : MonoBehaviour
             _airborneTime = 0f;
         }
         else
+        {
             _airborneTime += dt;
+            _coyoteTime -= dt;
+        }
 
         bool wantsSprint = SprintHeld && !IsCrouching && planar.sqrMagnitude > 0.05f;
         if (useStamina)
@@ -368,11 +386,11 @@ public class HorrorFirstPersonController : MonoBehaviour
         else if (IsSprinting)
             targetSpeed = sprintSpeed;
         if (swimming)
-            targetSpeed = IsSprinting ? 2.7f : 1.95f;
+            targetSpeed = IsSprinting ? 2.35f : 1.65f;
         else if (inWater)
             targetSpeed *= 0.85f;
 
-        if (planar.sqrMagnitude < 0.0001f)
+        if (!swimming && planar.sqrMagnitude < 0.0001f)
             targetSpeed = 0f;
 
         _currentSpeed = Mathf.Lerp(_currentSpeed, targetSpeed, 1f - Mathf.Exp(-acceleration * dt));
@@ -380,66 +398,28 @@ public class HorrorFirstPersonController : MonoBehaviour
 
         if (swimming)
         {
-            if (_verticalVelocity < -3.5f)
-                _verticalVelocity = Mathf.Lerp(_verticalVelocity, -1.2f, 1f - Mathf.Exp(-8f * dt));
-
-            Vector3 swimFwd = planar.sqrMagnitude > 0.04f ? planar.normalized : transform.forward;
-            swimFwd.y = 0f;
-            if (swimFwd.sqrMagnitude > 0.001f)
-                swimFwd.Normalize();
-
-            if (climbingOut)
+            _jumpedThisAir = false;
+            if (!wasSwimming)
             {
-                float need = ledgeY + 0.06f - transform.position.y;
-                _verticalVelocity = Mathf.Max(_verticalVelocity, Mathf.Clamp(need * 6.5f, 2.8f, 6.2f));
-                velocity = swimFwd * Mathf.Max(_currentSpeed, 2.4f);
-                velocity.y = _verticalVelocity;
-                _jumpQueued = false;
-                _controller.Move(velocity * dt);
-                if (IsOnWalkableGround())
-                {
-                    IsSwimming = false;
-                    _verticalVelocity = -2f;
-                    _wasGrounded = true;
-                }
-                else
-                    _wasGrounded = false;
-                UpdateFootsteps(dt, _wasGrounded, planar.magnitude);
-                LocalPlanarVelocity = transform.InverseTransformDirection(new Vector3(_controller.velocity.x, 0f, _controller.velocity.z));
-                return;
+                _swimVel = planar * _currentSpeed;
+                _swimVel.y = Mathf.Clamp(_verticalVelocity, -4.2f, 3.5f);
             }
-
-            float targetYVel;
-            if (_jumpQueued || (Keyboard.current != null && Keyboard.current.spaceKey.isPressed))
-                targetYVel = 2.5f;
-            else if (CrouchHeld)
-                targetYVel = -2.15f;
-            else
-            {
-                float camLocalY = cameraPivot != null ? cameraPivot.localPosition.y : standingCameraHeight;
-                float wantFeet = waterY - camLocalY - 0.34f;
-                targetYVel = (wantFeet - transform.position.y) * 2.6f;
-                targetYVel = Mathf.Clamp(targetYVel, -2.4f, 2.4f);
-            }
-            _verticalVelocity = Mathf.Lerp(_verticalVelocity, targetYVel, 1f - Mathf.Exp(-5.5f * dt));
-            _jumpQueued = false;
-            velocity.y = _verticalVelocity;
-            _controller.Move(velocity * dt);
-            UpdateFootsteps(dt, false, planar.magnitude);
-            LocalPlanarVelocity = transform.InverseTransformDirection(new Vector3(_controller.velocity.x, 0f, _controller.velocity.z));
-            _wasGrounded = false;
+            UpdateSwim(dt, waterY, floatFeet, nearLedge, planar);
             return;
         }
+
+        _heaving = false;
 
         if (grounded && _verticalVelocity < 0f)
             _verticalVelocity = -2f;
 
-        if (_jumpQueued && grounded && !IsCrouching)
+        if (_jumpQueued && _coyoteTime > 0f && !IsCrouching)
         {
             _verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
             _jumpQueued = false;
             PlayJumpSound();
             _jumpedThisAir = true;
+            _coyoteTime = 0f;
             _stepTimer = 0f;
         }
         else
@@ -447,7 +427,14 @@ public class HorrorFirstPersonController : MonoBehaviour
             _jumpQueued = false;
         }
 
-        _verticalVelocity += gravity * dt;
+        if (overWater && !grounded && _verticalVelocity < 0f && feetY < waterY + 0.45f)
+        {
+            _verticalVelocity += gravity * 0.55f * dt;
+            if (_verticalVelocity < -4.5f)
+                _verticalVelocity = Mathf.Lerp(_verticalVelocity, -3.2f, 1f - Mathf.Exp(-6f * dt));
+        }
+        else
+            _verticalVelocity += gravity * dt;
         velocity.y = _verticalVelocity;
 
         Vector3 before = transform.position;
@@ -466,6 +453,110 @@ public class HorrorFirstPersonController : MonoBehaviour
         Vector3 worldVel = _controller.velocity;
         LocalPlanarVelocity = transform.InverseTransformDirection(new Vector3(worldVel.x, 0f, worldVel.z));
         _wasGrounded = grounded;
+    }
+
+    void UpdateSwim(float dt, float waterY, float floatFeet, bool nearLedge, Vector3 planar)
+    {
+        Transform look = playerCamera != null ? playerCamera.transform : (cameraPivot != null ? cameraPivot : transform);
+        Vector3 right = look.right;
+        right.y = 0f;
+        if (right.sqrMagnitude < 0.0001f)
+            right = transform.right;
+        right.Normalize();
+
+        Vector3 wish = look.forward * _moveInput.y + right * _moveInput.x;
+        bool space = _jumpQueued || (Keyboard.current != null && Keyboard.current.spaceKey.isPressed);
+        bool atSurface = transform.position.y >= floatFeet - 0.28f && transform.position.y <= floatFeet + 0.28f;
+
+        if (!_heaving && space && atSurface && _wasAtSwimSurface && Time.time >= _heaveLockUntil)
+        {
+            _heaving = true;
+            _heaveLockUntil = Time.time + 1.7f;
+            _verticalVelocity = Mathf.Sqrt(2f * 7.5f * 0.7f);
+            _swimVel.y = _verticalVelocity;
+        }
+        _jumpQueued = false;
+
+        if (_heaving)
+        {
+            Vector3 air = planar * Mathf.Min(_currentSpeed, 1.8f);
+            float heaveG = _verticalVelocity > 0f ? -7.5f : -6.2f;
+            _verticalVelocity += heaveG * dt;
+            if (_verticalVelocity < -2.8f)
+                _verticalVelocity = Mathf.Lerp(_verticalVelocity, -2.4f, 1f - Mathf.Exp(-4.5f * dt));
+            _swimVel.x = air.x;
+            _swimVel.z = air.z;
+            _swimVel.y = _verticalVelocity;
+            _controller.Move(_swimVel * dt);
+            SeparateFromBoatPieces(true);
+            if (IsOnWalkableGround())
+            {
+                IsSwimming = false;
+                _heaving = false;
+                _verticalVelocity = -2f;
+                _swimVel = Vector3.zero;
+                _wasGrounded = true;
+            }
+            else
+            {
+                _wasGrounded = false;
+                if (transform.position.y <= floatFeet + 0.12f && _verticalVelocity <= 0f)
+                    _heaving = false;
+            }
+            FinishSwimMove(planar);
+            return;
+        }
+
+        if (_swimVel.y < -1.15f)
+            _swimVel.y = Mathf.Lerp(_swimVel.y, -0.85f, 1f - Mathf.Exp(-5.5f * dt));
+
+        if (space && !atSurface)
+            wish += Vector3.up * 1.15f;
+        if (CrouchHeld)
+            wish += Vector3.down * 1.2f;
+        if (wish.sqrMagnitude > 1f)
+            wish.Normalize();
+
+        float speed = _moveInput.sqrMagnitude > 0.04f || space || CrouchHeld
+            ? (IsSprinting ? 2.35f : 1.65f)
+            : 0f;
+        Vector3 target = wish * speed;
+
+        float buoy = Mathf.Clamp((floatFeet - transform.position.y) * 1.55f, -1.15f, 1.2f);
+        if (wish.y < -0.15f)
+            buoy *= 0.2f;
+        else if (wish.sqrMagnitude > 0.08f)
+            buoy *= 0.45f;
+        target.y += buoy;
+
+        float accel = 4.2f;
+        _swimVel = Vector3.Lerp(_swimVel, target, 1f - Mathf.Exp(-accel * dt));
+        _swimVel *= 1f - Mathf.Clamp01(1.15f * dt);
+
+        if (transform.position.y > floatFeet + 0.1f && _swimVel.y > 0f)
+            _swimVel.y = Mathf.Min(_swimVel.y, (floatFeet - transform.position.y) * 4.5f);
+
+        _verticalVelocity = _swimVel.y;
+        _controller.Move(_swimVel * dt);
+        SeparateFromBoatPieces(nearLedge);
+        if (transform.position.y > floatFeet + 0.18f)
+        {
+            float pull = (transform.position.y - floatFeet) * Mathf.Min(1f, 3.2f * dt);
+            _controller.Move(Vector3.down * pull);
+            _swimVel.y = Mathf.Min(_swimVel.y, -0.15f);
+            _verticalVelocity = _swimVel.y;
+        }
+
+        _wasGrounded = false;
+        _wasAtSwimSurface = atSurface && !_heaving;
+        FinishSwimMove(planar);
+    }
+
+    void FinishSwimMove(Vector3 planar)
+    {
+        _currentSpeed = new Vector2(_swimVel.x, _swimVel.z).magnitude;
+        UpdateFootsteps(Time.deltaTime, false, planar.magnitude);
+        LocalPlanarVelocity = transform.InverseTransformDirection(new Vector3(_controller.velocity.x, 0f, _controller.velocity.z));
     }
 
     bool TryFindWaterExit(Vector3 planar, float waterY, out float ledgeY)
@@ -493,10 +584,14 @@ public class HorrorFirstPersonController : MonoBehaviour
                 continue;
             if (hit.transform == transform || hit.transform.IsChildOf(transform))
                 continue;
-            bool boat = hit.collider != null && hit.collider.GetComponentInParent<BoatPiece>() != null;
+            if (hit.collider == null || hit.collider.GetComponentInParent<BoatWater>() != null)
+                continue;
+            bool boat = hit.collider.GetComponentInParent<BoatPiece>() != null;
             if (hit.normal.y < minNy && !boat)
                 continue;
-            if (hit.point.y < feet - 0.02f || hit.point.y > feet + 1.2f)
+            if (!boat && hit.point.y <= waterY + 0.08f)
+                continue;
+            if (hit.point.y < feet - 0.05f || hit.point.y > feet + 1.2f)
                 continue;
             if (hit.point.y > waterY + 0.95f)
                 continue;
@@ -511,6 +606,47 @@ public class HorrorFirstPersonController : MonoBehaviour
             return false;
         ledgeY = best;
         return true;
+    }
+
+    void SeparateFromBoatPieces(bool climbing)
+    {
+        if (_controller == null)
+            return;
+        float r = Mathf.Max(0.08f, _controller.radius * 0.92f);
+        Vector3 p1 = transform.position + Vector3.up * r;
+        Vector3 p2 = transform.position + Vector3.up * Mathf.Max(r + 0.05f, _controller.height - r);
+        int n = Physics.OverlapCapsuleNonAlloc(p1, p2, r, _groundOverlap, groundMask, QueryTriggerInteraction.Ignore);
+        Vector3 push = Vector3.zero;
+        for (int i = 0; i < n; i++)
+        {
+            var col = _groundOverlap[i];
+            if (col == null || col.GetComponentInParent<BoatPiece>() == null)
+                continue;
+            if (col.GetComponentInParent<BoatIgnoreActors>() != null)
+                continue;
+            if (col.transform == transform || col.transform.IsChildOf(transform))
+                continue;
+            if (!Physics.ComputePenetration(
+                    _controller, transform.position, transform.rotation,
+                    col, col.transform.position, col.transform.rotation,
+                    out Vector3 dir, out float dist) || dist <= 0.001f)
+                continue;
+            if (!climbing && dir.y > 0.25f)
+            {
+                dir.y = 0f;
+                if (dir.sqrMagnitude < 0.0001f)
+                {
+                    dir = transform.position - col.bounds.center;
+                    dir.y = 0f;
+                }
+                if (dir.sqrMagnitude < 0.0001f)
+                    continue;
+                dir.Normalize();
+            }
+            push += dir * (dist + 0.03f);
+        }
+        if (push.sqrMagnitude > 0.0001f)
+            _controller.Move(push);
     }
 
     /// <summary>
@@ -535,21 +671,19 @@ public class HorrorFirstPersonController : MonoBehaviour
             Transform t = hits[i].transform;
             if (t == null || t == transform || t.IsChildOf(transform))
                 continue;
-            if (hits[i].normal.y >= minY)
-                return true;
-            if (hits[i].collider != null && hits[i].collider.GetComponentInParent<BoatPiece>() != null)
-                return true;
+            if (!IsStandSurface(hits[i].collider, hits[i].point, hits[i].normal.y >= minY))
+                continue;
+            return true;
         }
 
         if (Physics.Raycast(transform.position + Vector3.up * 0.28f, Vector3.down, out RaycastHit ray,
                 0.55f, groundMask, QueryTriggerInteraction.Ignore))
         {
             if (ray.transform != transform && !ray.transform.IsChildOf(transform) &&
-                (ray.normal.y >= minY || ray.collider.GetComponentInParent<BoatPiece>() != null))
+                IsStandSurface(ray.collider, ray.point, ray.normal.y >= minY))
                 return true;
         }
 
-        // Тонкие доски уже перекрыты капсулой — SphereCast их пропускает.
         Vector3 feet = transform.position + Vector3.up * 0.12f;
         int n = Physics.OverlapSphereNonAlloc(feet, radius + 0.06f, _groundOverlap, groundMask, QueryTriggerInteraction.Ignore);
         for (int i = 0; i < n; i++)
@@ -557,11 +691,30 @@ public class HorrorFirstPersonController : MonoBehaviour
             var col = _groundOverlap[i];
             if (col == null || col.transform == transform || col.transform.IsChildOf(transform))
                 continue;
-            if (col.GetComponentInParent<BoatPiece>() != null)
+            Vector3 p = col.ClosestPoint(feet);
+            Vector3 away = feet - p;
+            bool flat = away.sqrMagnitude < 0.0001f || away.normalized.y >= minY;
+            if (IsStandSurface(col, p, flat))
                 return true;
         }
 
         return false;
+    }
+
+    bool IsStandSurface(Collider col, Vector3 point, bool flatEnough)
+    {
+        if (col == null)
+            return false;
+        if (col.GetComponentInParent<BoatWater>() != null)
+            return false;
+        bool boat = col.GetComponentInParent<BoatPiece>() != null;
+        if (boat)
+            return flatEnough;
+        if (!flatEnough)
+            return false;
+        if (BoatWater.TryHeight(point, out float waterY) && point.y < waterY - 0.08f)
+            return false;
+        return true;
     }
 
     void UpdateCameraMotion(float dt)
@@ -593,7 +746,6 @@ public class HorrorFirstPersonController : MonoBehaviour
         _bobTimer += dt * bobFreq * _bobWeight;
         StepCycle = Mathf.Repeat(_bobTimer, 1f);
 
-        // Удар шага: в нижней точке цикла камера чуть проседает — как перенос веса.
         if (_bobWeight > 0.25f && _wasGrounded)
         {
             float prev = Mathf.Sin(prevCycle * Mathf.PI * 2f);
@@ -609,8 +761,25 @@ public class HorrorFirstPersonController : MonoBehaviour
         float cycle = _bobTimer * Mathf.PI * 2f;
         float bobY = Mathf.Sin(cycle) * bobAmount * _bobWeight;
         float bobX = Mathf.Sin(cycle * 0.5f) * bobAmount * bobHorizontalScale * _bobWeight;
-        // Лёгкая «восьмёрка» вместо голого синуса.
         bobY += Mathf.Sin(cycle * 2f) * bobAmount * 0.12f * _bobWeight;
+        float swimPitch = 0f;
+        float swimRoll = 0f;
+
+        if (IsSwimming)
+        {
+            float swimSpeed = _controller.velocity.magnitude;
+            float stroke = Mathf.Clamp01(swimSpeed / 1.55f);
+            _swimBobTime += dt * (0.62f + stroke * 1.05f);
+            float t = _swimBobTime;
+            bobY = Mathf.Sin(t * 1.15f) * 0.032f + Mathf.Sin(t * 0.47f) * 0.022f;
+            bobY += Mathf.Sin(t * 2.55f) * 0.042f * stroke;
+            bobX = Mathf.Sin(t * 1.28f) * 0.018f + Mathf.Sin(t * 2.55f) * 0.028f * stroke;
+            if (_heaving)
+                bobY += Mathf.Clamp(_verticalVelocity * 0.014f, -0.07f, 0.09f);
+            swimPitch = Mathf.Sin(t * 2.55f) * 2.1f * stroke + Mathf.Sin(t * 0.62f) * 0.7f;
+            swimRoll = Mathf.Sin(t * 1.28f) * (1.1f + 1.6f * stroke);
+            _bobWeight = stroke;
+        }
 
         float breath = Mathf.Sin(_idleTimer * 1.15f) * idleSway * (1.15f - _bobWeight * 0.6f);
         float breathX = Mathf.Cos(_idleTimer * 0.67f) * idleSway * 0.45f;
@@ -641,13 +810,15 @@ public class HorrorFirstPersonController : MonoBehaviour
         float accel = (planarSpeed - _prevPlanarSpeed) / Mathf.Max(dt, 0.0001f);
         _prevPlanarSpeed = planarSpeed;
         float accelTarget = Mathf.Clamp(-accel * 0.035f * accelPitch, -accelPitch, accelPitch);
-        if (!_wasGrounded)
+        if (!_wasGrounded && !IsSwimming)
             accelTarget += Mathf.Clamp(_verticalVelocity * 0.04f, -2.5f, 1.2f);
-        _accelTilt = Mathf.SmoothDamp(_accelTilt, accelTarget, ref _accelTiltVel, 0.16f, 25f, dt);
+        if (IsSwimming)
+            accelTarget = swimPitch;
+        _accelTilt = Mathf.SmoothDamp(_accelTilt, accelTarget, ref _accelTiltVel, IsSwimming ? 0.22f : 0.16f, 25f, dt);
 
         float walkRoll = Mathf.Sin(cycle * 0.5f) * bobRollAmount * _bobWeight;
         float lookRoll = Mathf.Clamp(-LookVelocity.x * 0.004f, -1.1f, 1.1f);
-        float targetRoll = walkRoll + _lean + lookRoll;
+        float targetRoll = walkRoll + _lean + lookRoll + swimRoll;
         _camRoll = Mathf.Lerp(_camRoll, targetRoll, 1f - Mathf.Exp(-cameraSmoothing * dt));
 
         cam.localRotation = Quaternion.Euler(_lagPitch + _accelTilt, _lagYaw, _camRoll);

@@ -361,6 +361,25 @@ public static class BoatBuildUtil
         return col.GetComponentInParent<CharacterController>() != null;
     }
 
+    public static void EnsureCollideWithActors(Collider col)
+    {
+        if (col == null)
+            return;
+        var actors = Object.FindObjectsByType<CharacterController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < actors.Length; i++)
+        {
+            if (actors[i] == null)
+                continue;
+            var cols = actors[i].GetComponentsInChildren<Collider>(true);
+            for (int c = 0; c < cols.Length; c++)
+            {
+                if (cols[c] == null)
+                    continue;
+                Physics.IgnoreCollision(col, cols[c], false);
+            }
+        }
+    }
+
     public static void MoveCluster(System.Collections.Generic.IList<BoatPiece> pieces, Vector3 delta)
     {
         if (pieces == null || delta.sqrMagnitude < 0.0000001f)
@@ -480,7 +499,7 @@ public static class BoatBuildUtil
                 push.y = 0f;
             if (push.sqrMagnitude < 0.0001f)
                 push = Vector3.up;
-            MoveCluster(pieces, push.normalized * (best + 0.05f));
+            MoveCluster(pieces, push.normalized * (best + 0.14f));
         }
     }
 
@@ -593,8 +612,8 @@ public static class BoatBuildUtil
         const float holdDelay = 0.16f;
         const float holdDeg = 120f;
         bool shift = kb != null && (kb.leftShiftKey.isPressed || kb.rightShiftKey.isPressed);
-        float tapStep = shift ? 2f : tap;
-        float holdSpeed = shift ? holdDeg * 0.4f : holdDeg;
+        float tapStep = tap;
+        float holdSpeed = holdDeg;
 
         if (kb != null && kb.qKey.wasPressedThisFrame)
         {
@@ -630,7 +649,13 @@ public static class BoatBuildUtil
         {
             float scroll = mouse.scroll.ReadValue().y;
             if (Mathf.Abs(scroll) > 0.01f)
-                yaw += scroll > 0f ? tapStep : -tapStep;
+            {
+                float step = scroll > 0f ? tapStep : -tapStep;
+                if (shift)
+                    roll += step;
+                else
+                    yaw += step;
+            }
         }
     }
 

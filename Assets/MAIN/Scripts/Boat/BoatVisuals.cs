@@ -85,9 +85,9 @@ public static class BoatVisuals
     {
         switch (kind)
         {
-            case BoatPieceKind.Barrel: return 38f;
-            case BoatPieceKind.Log: return 18f;
-            default: return 9f;
+            case BoatPieceKind.Barrel: return 52f;
+            case BoatPieceKind.Log: return 38f;
+            default: return 30f;
         }
     }
 

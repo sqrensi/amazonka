@@ -140,7 +140,7 @@ public class BoatClusterItem : HeldItem
         base.OnEquip();
         HideHeldMesh();
         _ghostFollow = false;
-        BoatBuildHud.Hint("LMB place   Wheel turn   hold Q/E tilt   G drop", 4f);
+        BoatBuildHud.Hint("LMB place   Wheel yaw   Shift+Wheel roll   hold Q/E tilt   G drop", 4f);
     }
 
     public override void OnUnequip()
@@ -281,7 +281,8 @@ public class BoatClusterItem : HeldItem
                 nails[n]?.RebuildJoint();
         }
         BoatRope.RebuildOwned(pieces);
-        BoatBuildUtil.IgnoreActorsBriefly(pieces, 1.6f);
+        BoatBuildUtil.NudgeClusterFromActors(pieces);
+        BoatBuildUtil.IgnoreActorsBriefly(pieces, 1.15f);
         Physics.SyncTransforms();
 
         for (int i = 0; i < pieces.Count; i++)

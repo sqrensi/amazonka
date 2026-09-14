@@ -20,6 +20,12 @@ public class BoatWater : MonoBehaviour
         if (!All.Contains(this))
             All.Add(this);
         _volume = GetComponent<BoxCollider>();
+        var cols = GetComponents<Collider>();
+        for (int i = 0; i < cols.Length; i++)
+        {
+            if (cols[i] != null)
+                cols[i].isTrigger = true;
+        }
         if (Mathf.Abs(surfaceY) < 0.0001f)
             surfaceY = transform.position.y + MeshTopLocal();
         EnsureUnderside();

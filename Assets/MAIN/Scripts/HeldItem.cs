@@ -56,6 +56,8 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
     Collider _col;
     bool _carried;
     Coroutine _ignoreRoutine;
+    Collider[] _ignoreSelf;
+    Collider[] _ignoreOthers;
     float _droppedAt = -100f;
     bool _droppedByPlayer;
 
@@ -440,6 +442,11 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
         return any ? b : new Bounds(Vector3.zero, Vector3.one * 0.3f);
     }
 
+    void OnDisable()
+    {
+        RestorePlayerIgnore();
+    }
+
     void StopIgnoreRoutine()
     {
         if (_ignoreRoutine != null)
@@ -447,17 +454,18 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
             StopCoroutine(_ignoreRoutine);
             _ignoreRoutine = null;
         }
+        RestorePlayerIgnore();
     }
 
     IEnumerator IgnorePlayerUntilClear(GameObject other)
     {
-        var others = other.GetComponentsInChildren<Collider>(true);
-        var self = GetComponentsInChildren<Collider>(true);
-        SetIgnore(self, others, true);
+        _ignoreOthers = other.GetComponentsInChildren<Collider>(true);
+        _ignoreSelf = GetComponentsInChildren<Collider>(true);
+        SetIgnore(_ignoreSelf, _ignoreOthers, true);
 
         float clearDist = 1.15f;
         float t = 0f;
-        while (t < 1.25f && other != null)
+        while (t < 0.35f && other != null)
         {
             Vector3 delta = transform.position - other.transform.position;
             delta.y = 0f;
@@ -467,8 +475,17 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
             yield return null;
         }
 
-        SetIgnore(self, others, false);
+        RestorePlayerIgnore();
         _ignoreRoutine = null;
+    }
+
+    void RestorePlayerIgnore()
+    {
+        if (_ignoreSelf == null || _ignoreOthers == null)
+            return;
+        SetIgnore(_ignoreSelf, _ignoreOthers, false);
+        _ignoreSelf = null;
+        _ignoreOthers = null;
     }
 
     static void SetIgnore(Collider[] a, Collider[] b, bool ignore)

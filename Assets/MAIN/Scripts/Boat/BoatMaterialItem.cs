@@ -124,7 +124,7 @@ public class BoatMaterialItem : HeldItem
         base.OnEquip();
         HideHeldMesh();
         _ghostFollow = false;
-        BoatBuildHud.Hint("LMB place   Wheel turn   hold Q/E tilt   G drop", 4f);
+        BoatBuildHud.Hint("LMB place   Wheel yaw   Shift+Wheel roll   hold Q/E tilt   G drop", 4f);
     }
 
     public override void OnUnequip()
@@ -243,6 +243,20 @@ public class BoatMaterialItem : HeldItem
             return;
         var piece = gameObject.AddComponent<BoatPiece>();
         piece.Configure(kind, WorldSize);
+        var pieces = new System.Collections.Generic.List<BoatPiece> { piece };
+        BoatBuildUtil.NudgeClusterFromActors(pieces);
+        BoatBuildUtil.IgnoreActorsBriefly(pieces, 1.25f);
+        var rb = piece.Body;
+        if (rb != null)
+        {
+            rb.maxDepenetrationVelocity = 1.1f;
+            Vector3 v = rb.linearVelocity;
+            v.x *= 0.45f;
+            v.z *= 0.45f;
+            if (v.y > 2.5f)
+                v.y = 2.5f;
+            BoatBuildUtil.SetMotion(rb, v, rb.angularVelocity * 0.4f);
+        }
         Destroy(this);
     }
 
