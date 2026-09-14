@@ -88,6 +88,8 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
 
     public bool CanInteract(GameObject interactor)
     {
+        if (BoatOarStation.Active != null)
+            return false;
         if (_carried || !isActiveAndEnabled || interactor == null)
             return false;
         if (GetComponent<BoatPiece>() != null)

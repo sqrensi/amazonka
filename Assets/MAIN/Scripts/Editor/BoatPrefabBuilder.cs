@@ -33,7 +33,6 @@ static class BoatPrefabBuilder
         SaveItem(BoatFactory.CreateMaterial(BoatPieceKind.Log), "LogItem", "Log", 2);
         SaveItem(BoatFactory.CreateMaterial(BoatPieceKind.Barrel), "BarrelItem", "Barrel", 2);
         SaveItem(BoatFactory.CreateMaterial(BoatPieceKind.Oar), "MountOarItem", "Oar", 2);
-        SaveItem(BoatFactory.CreateHandOar(), "HandOarItem", "Paddle", 2);
         SaveItem(BoatFactory.CreateNail(), "NailItem", "Nail", 3);
         SaveItem(BoatFactory.CreateRope(), "RopeItem", "Rope", 3);
         SaveItem(BoatFactory.CreateHammer(), "HammerItem", "Hammer", 4);
@@ -105,8 +104,6 @@ static class BoatPrefabBuilder
             else if (wood.Kind == BoatPieceKind.Oar)
                 vis = UrpMat("BoatWoodDark", new Color(0.42f, 0.28f, 0.14f));
         }
-        else if (item is OarItem)
-            vis = UrpMat("BoatWoodDark", new Color(0.42f, 0.28f, 0.14f));
         else if (item is NailItem)
             vis = UrpMat("BoatMetal", new Color(0.62f, 0.64f, 0.68f), 0.65f, 0.4f);
         else if (item is RopeItem)
@@ -127,13 +124,6 @@ static class BoatPrefabBuilder
             posProp.vector3Value = Vector3.zero;
         if (eulerProp != null)
             eulerProp.vector3Value = Vector3.zero;
-        if (item is OarItem)
-        {
-            if (posProp != null)
-                posProp.vector3Value = Vector3.zero;
-            if (eulerProp != null)
-                eulerProp.vector3Value = new Vector3(-58f, 0f, 0f);
-        }
         var kindProp = so.FindProperty("kind");
         if (kindProp != null && item is BoatMaterialItem mat)
             kindProp.intValue = (int)mat.Kind;
@@ -177,7 +167,6 @@ static class BoatPrefabBuilder
         Scatter(root.transform, "RopeItem", 3, new Vector3(-0.5f, 0.15f, 1.1f), 0.6f);
         Place(root.transform, "HammerItem", new Vector3(0.2f, 0.15f, -0.8f));
         Place(root.transform, "SawItem", new Vector3(-0.3f, 0.15f, -0.8f));
-        Scatter(root.transform, "HandOarItem", 2, new Vector3(1.1f, 0.2f, -1.1f), 0.5f);
         Scatter(root.transform, "MountOarItem", 2, new Vector3(-1.2f, 0.2f, -1.0f), 0.5f);
         PrefabUtility.SaveAsPrefabAsset(root, BoatDir + "/BoatKit.prefab");
         Object.DestroyImmediate(root);
@@ -218,7 +207,6 @@ static class BoatPrefabBuilder
         BoatCatalog.Hammer = Load<HammerItem>("HammerItem");
         BoatCatalog.Saw = Load<SawItem>("SawItem");
         BoatCatalog.Oar = Load<BoatMaterialItem>("MountOarItem");
-        BoatCatalog.HandOar = Load<OarItem>("HandOarItem");
     }
 
     static T Load<T>(string file) where T : Component

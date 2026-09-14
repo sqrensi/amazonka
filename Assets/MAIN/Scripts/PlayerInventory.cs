@@ -74,7 +74,7 @@ public class PlayerInventory : MonoBehaviour
     {
         UpdateObstruction();
         if (Keyboard.current != null && Keyboard.current.gKey.wasPressedThisFrame &&
-            Cursor.lockState == CursorLockMode.Locked)
+            Cursor.lockState == CursorLockMode.Locked && BoatOarStation.Active == null)
             DropEquipped();
     }
 
@@ -94,6 +94,8 @@ public class PlayerInventory : MonoBehaviour
     /// </summary>
     public bool PickupExisting(HeldItem item)
     {
+        if (BoatOarStation.Active != null)
+            return false;
         if (item == null || item.IsCarried)
             return false;
 
@@ -146,6 +148,8 @@ public class PlayerInventory : MonoBehaviour
 
     public void EquipSlot(int index)
     {
+        if (BoatOarStation.Active != null)
+            return;
         if (index < 0 || index >= SlotCount)
             return;
 
@@ -183,6 +187,8 @@ public class PlayerInventory : MonoBehaviour
     /// <summary>Выбросить предмет из рук в мир — тот же объект, состояние (свет) сохраняется.</summary>
     public bool DropEquipped()
     {
+        if (BoatOarStation.Active != null)
+            return false;
         HeldItem item = Current;
         if (item == null)
             return false;

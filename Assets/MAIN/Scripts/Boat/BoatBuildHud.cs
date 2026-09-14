@@ -21,6 +21,8 @@ public class BoatBuildHud : MonoBehaviour
 
     public static void Hint(string text, float seconds = 2.4f)
     {
+        if (BoatOarStation.Active != null)
+            return;
         var hud = Instance();
         if (hud == null)
             return;
@@ -90,6 +92,12 @@ public class BoatBuildHud : MonoBehaviour
     {
         if (_label == null)
             return;
+        if (BoatOarStation.Active != null)
+        {
+            _label.text = "";
+            _until = 0f;
+            return;
+        }
         if (Time.unscaledTime > _until)
             _label.text = "";
     }

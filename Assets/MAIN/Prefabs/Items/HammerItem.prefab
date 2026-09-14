@@ -100,8 +100,8 @@ GameObject:
   m_Component:
   - component: {fileID: 8248982464454319252}
   - component: {fileID: 749154594702132975}
-  - component: {fileID: 6363544282733689342}
-  - component: {fileID: 2357962689097900204}
+  - component: {fileID: 4737079320260444062}
+  - component: {fileID: 1834255741968204563}
   m_Layer: 0
   m_Name: HammerItem
   m_TagString: Untagged
@@ -150,7 +150,7 @@ MonoBehaviour:
   retractedEulerOffset: {x: -10, y: 6, z: -8}
   retractSmoothTime: 0.42
   useBlockThreshold: 0.82
---- !u!65 &6363544282733689342
+--- !u!65 &4737079320260444062
 BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -171,7 +171,7 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.2625, y: 0.34499997, z: 0.12}
   m_Center: {x: 0.0012499988, y: 0.022499993, z: 0}
---- !u!54 &2357962689097900204
+--- !u!54 &1834255741968204563
 Rigidbody:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

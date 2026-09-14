@@ -41,6 +41,11 @@ public class PlayerInteractor : MonoBehaviour
 
     void TryRow()
     {
+        if (BoatOarStation.Active != null)
+        {
+            BoatOarStation.Toggle(gameObject, BoatOarStation.Active.Oar);
+            return;
+        }
         if (_current is BoatPiece piece)
             piece.TryRow(gameObject);
     }
@@ -49,6 +54,8 @@ public class PlayerInteractor : MonoBehaviour
     {
         _current = null;
         _currentComponent = null;
+        if (BoatOarStation.Active != null)
+            return;
         if (_cam == null)
             _cam = GetComponentInChildren<Camera>();
         if (_cam == null)
@@ -175,6 +182,8 @@ public class PlayerInteractor : MonoBehaviour
     public void OnInteract(InputValue value)
     {
         if (!value.isPressed)
+            return;
+        if (BoatOarStation.Active != null)
             return;
 
         if (_current != null && _current.CanInteract(gameObject))

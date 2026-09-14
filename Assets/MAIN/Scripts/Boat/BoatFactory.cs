@@ -51,13 +51,6 @@ public static class BoatFactory
         return go.AddComponent<SawItem>();
     }
 
-    public static OarItem CreateHandOar()
-    {
-        var go = new GameObject("HandOarItem");
-        BoatVisuals.BuildHandOar(go.transform);
-        return go.AddComponent<OarItem>();
-    }
-
     public static HeldItem Create(string id)
     {
         switch (id)
@@ -69,7 +62,6 @@ public static class BoatFactory
             case "Hammer": return CreateHammer();
             case "Saw": return CreateSaw();
             case "Oar": return CreateMaterial(BoatPieceKind.Oar);
-            case "HandOar": return CreateHandOar();
             default: return CreateMaterial(BoatPieceKind.Plank);
         }
     }

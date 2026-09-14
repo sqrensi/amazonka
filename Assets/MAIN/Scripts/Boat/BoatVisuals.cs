@@ -137,8 +137,8 @@ public static class BoatVisuals
     {
         if (kind == BoatPieceKind.Oar)
         {
-            center = new Vector3(0f, 0f, size.z * 0.5f);
-            box = new Vector3(0.2f, 0.16f, size.z);
+            center = new Vector3(0f, -0.3f, 0.2f);
+            box = new Vector3(0.18f, 0.05f, 0.14f);
             return;
         }
         center = Vector3.zero;
@@ -369,30 +369,6 @@ public static class BoatVisuals
     public static void BuildOar(Transform root, Material shaftMat = null, Material bladeMat = null)
     {
         BuildMountOar(root, shaftMat, bladeMat);
-    }
-
-    public static void BuildHandOar(Transform root, Material shaftMat = null, Material bladeMat = null)
-    {
-        if (root == null)
-            return;
-        DisableNamed(root, "Vis");
-        DisableNamed(root, "Vis_old");
-        ClearOarParts(root);
-        if (shaftMat == null)
-            shaftMat = WoodDark;
-        if (bladeMat == null)
-            bladeMat = Wood;
-        var shaft = Attach(root, PrimitiveType.Cylinder, new Vector3(0.032f, 0.96f, 0.032f), Quaternion.Euler(90f, 0f, 0f), shaftMat, "Shaft");
-        shaft.transform.localPosition = new Vector3(0f, 0f, 0.98f);
-        var neck = Attach(root, PrimitiveType.Cube, new Vector3(0.05f, 0.034f, 0.16f), shaftMat, "Neck");
-        neck.transform.localPosition = new Vector3(0f, 0f, 1.72f);
-        var blade = Attach(root, PrimitiveType.Cube, new Vector3(0.17f, 0.02f, 0.38f), bladeMat, "Blade");
-        blade.transform.localPosition = new Vector3(0f, 0f, 1.86f);
-        var grip = Attach(root, PrimitiveType.Cube, new Vector3(0.13f, 0.034f, 0.05f), shaftMat, "Handle");
-        grip.transform.localPosition = new Vector3(0f, 0f, 0.06f);
-        var cap = Attach(root, PrimitiveType.Cylinder, new Vector3(0.036f, 0.028f, 0.036f), Quaternion.Euler(90f, 0f, 0f), shaftMat, "HandleCap");
-        cap.transform.localPosition = new Vector3(0f, 0f, 0.03f);
-        EnableRenderers(root);
     }
 
     public static void BuildMountOar(Transform root, Material shaftMat = null, Material bladeMat = null)

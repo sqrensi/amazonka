@@ -24,7 +24,8 @@ public class PickupPromptHUD : MonoBehaviour
         if (_root == null)
             return;
 
-        bool show = _interactor != null && _interactor.HasTarget && _camera != null;
+        bool show = BoatOarStation.Active == null &&
+                    _interactor != null && _interactor.HasTarget && _camera != null;
         if (!show)
         {
             _root.SetActive(false);

@@ -13,7 +13,6 @@ public static class BoatCatalog
     public static HammerItem Hammer;
     public static SawItem Saw;
     public static BoatMaterialItem Oar;
-    public static OarItem HandOar;
 
     public static BoatMaterialItem ItemPrefab(BoatPieceKind kind)
     {

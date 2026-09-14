@@ -132,20 +132,23 @@ public static class BoatBuildUtil
     }
 
     static readonly Collider[] SupportScratch = new Collider[32];
+    static readonly Collider[] SitScratch = new Collider[24];
 
     /// <summary>
-    /// Верх тех деталей, в которые бокс реально врезается на этой высоте.
-    /// Рядом стоящие, но не пересекающиеся куски высоту не задают.
+    /// Высота опоры только если деталь своим следом реально ложится на другую.
+    /// Длинная доска на двух брёвнах со щелью между ними — следа хватает на оба.
+    /// Сосед сбоку, в который доска не упирается, высоту не задаёт.
     /// </summary>
     public static bool TryBlockedSupportY(Vector3 xz, float floorY, Quaternion rot, Vector3 size, GameObject ignore, out float topY)
     {
         topY = float.NegativeInfinity;
         Vector3 half = size * 0.5f;
-        half.x = Mathf.Max(0.04f, half.x * 0.94f);
-        half.z = Mathf.Max(0.04f, half.z * 0.94f);
-        half.y = Mathf.Max(half.y, 0.42f);
-        Vector3 pos = new Vector3(xz.x, floorY + half.y, xz.z);
-        int n = Physics.OverlapBoxNonAlloc(pos, half, SupportScratch, rot, ~0, QueryTriggerInteraction.Ignore);
+        half.x = Mathf.Max(0.03f, half.x * 0.94f);
+        half.z = Mathf.Max(0.03f, half.z * 0.94f);
+        Vector3 searchHalf = half;
+        searchHalf.y = Mathf.Max(0.4f, half.y);
+        Vector3 searchPos = new Vector3(xz.x, floorY + searchHalf.y, xz.z);
+        int n = Physics.OverlapBoxNonAlloc(searchPos, searchHalf, SupportScratch, rot, ~0, QueryTriggerInteraction.Ignore);
         bool any = false;
         for (int i = 0; i < n; i++)
         {
@@ -158,9 +161,30 @@ public static class BoatBuildUtil
                 continue;
             if (col.bounds.max.y <= floorY + 0.005f)
                 continue;
-            if (!any || col.bounds.max.y > topY)
+
+            float candY = col.bounds.max.y;
+            Vector3 sitPos = new Vector3(xz.x, candY + 0.03f, xz.z);
+            Vector3 sitHalf = new Vector3(half.x, 0.035f, half.z);
+            int m = Physics.OverlapBoxNonAlloc(sitPos, sitHalf, SitScratch, rot, ~0, QueryTriggerInteraction.Ignore);
+            bool rests = false;
+            for (int s = 0; s < m; s++)
             {
-                topY = col.bounds.max.y;
+                if (SitScratch[s] == col)
+                {
+                    rests = true;
+                    break;
+                }
+            }
+            if (!rests)
+                continue;
+
+            float y = candY;
+            Vector3 origin = new Vector3(xz.x, candY + 0.45f, xz.z);
+            if (col.Raycast(new Ray(origin, Vector3.down), out RaycastHit onTop, 1.4f))
+                y = onTop.point.y;
+            if (!any || y > topY)
+            {
+                topY = y;
                 any = true;
             }
         }
@@ -213,21 +237,25 @@ public static class BoatBuildUtil
 
         if (!spanNeighbors)
         {
-            float thick = Mathf.Min(0.09f, ProjectExtent(rot, size, n) + 0.02f);
-            Vector3 worldCenter = at + n * (thick + 0.02f);
-            return worldCenter - rot * localCenter;
+            float thick = Mathf.Min(0.08f, ProjectExtent(rot, size, n) + 0.02f);
+            Vector3 worldCenter = at + n * (thick + 0.025f);
+            Vector3 p = worldCenter - rot * localCenter;
+            float supportY = seedY;
+            if (TryBlockedSupportY(at, seedY - 0.12f, rot, size, owner, out float extraY))
+                supportY = Mathf.Max(supportY, extraY);
+            return LiftOrigin(p, rot, localCenter, size, supportY);
         }
 
         Vector3 probe = size;
-        probe.x = Mathf.Clamp(Mathf.Max(size.x, 0.2f), 0.2f, 1.25f);
-        probe.z = Mathf.Clamp(Mathf.Max(size.z, 0.2f), 0.2f, 1.25f);
-        probe.y = Mathf.Max(size.y, 0.12f);
+        probe.x = Mathf.Clamp(size.x, 0.08f, 1.25f);
+        probe.z = Mathf.Clamp(size.z, 0.08f, 1.25f);
+        probe.y = Mathf.Max(size.y, 0.06f);
 
-        float supportY = seedY;
-        if (TryBlockedSupportY(at, seedY - 0.15f, rot, probe, owner, out float extraY))
-            supportY = Mathf.Max(supportY, extraY);
+        float sitY = seedY;
+        if (TryBlockedSupportY(at, seedY - 0.15f, rot, probe, owner, out float liftY))
+            sitY = Mathf.Max(sitY, liftY);
 
-        return LiftOrigin(new Vector3(at.x, supportY, at.z), rot, localCenter, size, supportY);
+        return LiftOrigin(new Vector3(at.x, sitY, at.z), rot, localCenter, size, sitY);
     }
 
     public static Vector3 LiftOrigin(Vector3 pos, Quaternion rot, Vector3 localCenter, Vector3 size, float supportY)

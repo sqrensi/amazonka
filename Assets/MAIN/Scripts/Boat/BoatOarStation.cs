@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Прибитое весло: R сесть, ЛКМ грести, Q/E рулить. Игрок привязан к лодке.
+/// Прибитое весло: R сесть/выйти, ЛКМ вперёд, ПКМ назад, Q/E рулить. Пока гребёшь — без подсказок и без предметов.
 /// </summary>
 public class BoatOarStation : MonoBehaviour
 {
@@ -48,13 +48,16 @@ public class BoatOarStation : MonoBehaviour
         _oar = oar;
         _move = GetComponent<HorrorFirstPersonController>();
         Active = this;
+        var inv = GetComponent<PlayerInventory>();
+        if (inv != null)
+            inv.Holster();
         if (_move != null)
         {
             _move.MovementLocked = true;
             _move.BindBoatFollow();
         }
         CacheStroke();
-        BoatBuildHud.Hint("LMB row   Q/E steer   R stop", 4f);
+        BoatBuildHud.Clear();
     }
 
     void Stop()
@@ -64,7 +67,7 @@ public class BoatOarStation : MonoBehaviour
             _move.MovementLocked = false;
         if (Active == this)
             Active = null;
-        BoatBuildHud.Hint("");
+        BoatBuildHud.Clear();
         Destroy(this);
     }
 
@@ -129,14 +132,18 @@ public class BoatOarStation : MonoBehaviour
         }
 
         BoatPaddle.TickSteer(Time.deltaTime);
-        bool rowing = Mouse.current != null && Mouse.current.leftButton.isPressed
-            && Cursor.lockState == CursorLockMode.Locked;
+        var mouse = Mouse.current;
+        bool locked = Cursor.lockState == CursorLockMode.Locked;
+        bool forward = mouse != null && mouse.leftButton.isPressed && locked;
+        bool back = mouse != null && mouse.rightButton.isPressed && locked && !forward;
+        bool rowing = forward || back;
         if (rowing)
-            _stroke += Time.deltaTime * 3.1f;
+            _stroke += Time.deltaTime * 6.4f;
         else
             _stroke = 0f;
-        float target = rowing ? Mathf.Sin(_stroke) * 28f : 0f;
-        _angle = Mathf.Lerp(_angle, target, 1f - Mathf.Exp(-12f * Time.deltaTime));
+        float amp = 12f;
+        float target = rowing ? Mathf.Sin(_stroke) * amp * (back ? -1f : 1f) : 0f;
+        _angle = Mathf.Lerp(_angle, target, 1f - Mathf.Exp(-14f * Time.deltaTime));
         ApplyStroke(_angle);
     }
 
@@ -144,16 +151,21 @@ public class BoatOarStation : MonoBehaviour
     {
         if (_oar == null)
             return;
-        bool rowing = Mouse.current != null && Mouse.current.leftButton.isPressed
-            && Cursor.lockState == CursorLockMode.Locked;
-        if (!rowing)
+        var mouse = Mouse.current;
+        bool locked = Cursor.lockState == CursorLockMode.Locked;
+        bool forward = mouse != null && mouse.leftButton.isPressed && locked;
+        bool back = mouse != null && mouse.rightButton.isPressed && locked && !forward;
+        if (!forward && !back)
             return;
         if (!BoatPaddle.PieceBladeInWater(_oar))
             return;
         Rigidbody boat = _oar.IslandRootBody();
+        if (boat == null)
+            return;
         Transform blade = _oar.transform.Find("Blade");
         Vector3 at = blade != null ? blade.position : _oar.transform.position;
-        Vector3 dir = BoatPaddle.SteerDir(transform.forward);
-        BoatPaddle.Push(boat, dir, at, 42f);
+        Vector3 fwd = boat.transform.forward;
+        float sign = back ? -1f : 1f;
+        BoatPaddle.Push(boat, BoatPaddle.SteerDir(fwd) * sign, at, 190f);
     }
 }

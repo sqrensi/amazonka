@@ -31,8 +31,10 @@ public class BoatPiece : MonoBehaviour, IInteractable
 
     public string GetPrompt()
     {
+        if (BoatOarStation.Active != null)
+            return "";
         if (CanRow())
-            return BoatOarStation.IsUsing(this) ? "Stop rowing" : "Row";
+            return "Row";
         if (!CanBeCarried())
             return "";
         CollectIsland(IslandTmp);
@@ -124,6 +126,8 @@ public class BoatPiece : MonoBehaviour, IInteractable
 
     public bool CanInteract(GameObject interactor)
     {
+        if (BoatOarStation.Active != null)
+            return false;
         if (interactor == null || !isActiveAndEnabled)
             return false;
         if (CanRow())

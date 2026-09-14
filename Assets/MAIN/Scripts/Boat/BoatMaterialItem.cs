@@ -193,6 +193,11 @@ public class BoatMaterialItem : HeldItem
             _ghostRot = Quaternion.Slerp(_ghostRot, rot, 1f - Mathf.Exp(-10f * Time.deltaTime));
         }
         _ghost.transform.SetPositionAndRotation(_ghostPos, _ghostRot);
+        if (_ghostPos.y < pos.y)
+        {
+            _ghostPos.y = pos.y;
+            _ghost.transform.position = _ghostPos;
+        }
         SetRenderersHidden(true);
     }
 
