@@ -280,8 +280,8 @@ GameObject:
   m_Component:
   - component: {fileID: 5379972098512633381}
   - component: {fileID: 580984533619930853}
-  - component: {fileID: 4132125478792324452}
-  - component: {fileID: 522190145767383585}
+  - component: {fileID: 6578679105736044247}
+  - component: {fileID: 927746018697625089}
   m_Layer: 0
   m_Name: SawItem
   m_TagString: Untagged
@@ -342,7 +342,7 @@ MonoBehaviour:
   retractedEulerOffset: {x: -10, y: 6, z: -8}
   retractSmoothTime: 0.42
   useBlockThreshold: 0.82
---- !u!65 &4132125478792324452
+--- !u!65 &6578679105736044247
 BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -363,7 +363,7 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.12, y: 0.1809347, z: 0.4976111}
   m_Center: {x: 0, y: -0.012467362, z: 0.09219447}
---- !u!54 &522190145767383585
+--- !u!54 &927746018697625089
 Rigidbody:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

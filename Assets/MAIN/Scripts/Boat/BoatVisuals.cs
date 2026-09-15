@@ -145,32 +145,54 @@ public static class BoatVisuals
         box = size;
     }
 
+    /// <summary>Полный силуэт весла для посадки призрака, чтобы древко не уходило в поверхность.</summary>
+    public static void OarGhostBounds(out Vector3 center, out Vector3 size)
+    {
+        center = new Vector3(0f, -0.05f, 1.02f);
+        size = new Vector3(0.4f, 0.78f, 2.14f);
+    }
+
     /// <summary>Дочерний примитив Unity без своего коллайдера.</summary>
     public static GameObject Attach(Transform parent, PrimitiveType type, Vector3 localScale, Material mat, string name = "Vis")
     {
         return Attach(parent, type, localScale, Quaternion.identity, mat, name);
     }
 
-    public static void ClearChild(Transform parent, string name)
+    public static void StripStaleVisuals(Transform parent)
     {
         if (parent == null)
             return;
-        Transform old = parent.Find(name);
-        while (old != null)
+        for (int i = parent.childCount - 1; i >= 0; i--)
         {
-            GameObject go = old.gameObject;
-            go.name = name + "_old";
-            if (IsPrefabInstancePart(go))
-                go.SetActive(false);
-            else if (!Application.isPlaying)
-                Object.DestroyImmediate(go);
-            else
-                Object.Destroy(go);
-            old = parent.Find(name);
+            Transform child = parent.GetChild(i);
+            if (child == null)
+                continue;
+            string n = child.name;
+            if (n.EndsWith("_old", System.StringComparison.Ordinal) || n.EndsWith("_dead", System.StringComparison.Ordinal))
+                Retire(child.gameObject);
         }
     }
 
-    static bool IsPrefabInstancePart(Object obj)
+    public static void ClearChild(Transform parent, string name)
+    {
+        if (parent == null || string.IsNullOrEmpty(name))
+            return;
+        for (int n = 0; n < 16; n++)
+        {
+            Transform old = parent.Find(name);
+            if (old == null)
+                break;
+            Retire(old.gameObject);
+            if (old != null && old.name == name)
+            {
+                old.name = name + "_old";
+                old.gameObject.SetActive(false);
+                break;
+            }
+        }
+    }
+
+    static bool LockedInPrefabInstance(Object obj)
     {
         if (obj == null)
             return false;
@@ -181,8 +203,65 @@ public static class BoatVisuals
 #endif
     }
 
+    static void Retire(Object obj)
+    {
+        if (obj == null)
+            return;
+        if (LockedInPrefabInstance(obj))
+        {
+            if (obj is Collider col)
+            {
+                col.enabled = false;
+                return;
+            }
+            HidePrefabPart(obj);
+            return;
+        }
+
+        var go = obj as GameObject;
+        if (go != null)
+        {
+            go.name = go.name + "_dead";
+            go.SetActive(false);
+        }
+
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+        {
+            Object.DestroyImmediate(obj);
+            return;
+        }
+#endif
+        Object.Destroy(obj);
+    }
+
+    static void HidePrefabPart(Object obj)
+    {
+        var go = obj as GameObject;
+        if (go == null && obj is Component component)
+            go = component.gameObject;
+        if (go == null)
+            return;
+        if (!go.name.EndsWith("_old", System.StringComparison.Ordinal))
+            go.name += "_old";
+        go.SetActive(false);
+        var renderers = go.GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            if (renderers[i] != null)
+                renderers[i].enabled = false;
+        }
+        var cols = go.GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < cols.Length; i++)
+        {
+            if (cols[i] != null)
+                cols[i].enabled = false;
+        }
+    }
+
     public static GameObject Attach(Transform parent, PrimitiveType type, Vector3 localScale, Quaternion localRot, Material mat, string name = "Vis")
     {
+        StripStaleVisuals(parent);
         ClearChild(parent, name);
 
         var go = new GameObject(name);
@@ -375,8 +454,8 @@ public static class BoatVisuals
     {
         if (root == null)
             return;
-        DisableNamed(root, "Vis");
-        DisableNamed(root, "Vis_old");
+        StripStaleVisuals(root);
+        ClearChild(root, "Vis");
         ClearOarParts(root);
         if (shaftMat == null)
             shaftMat = WoodDark;
@@ -405,7 +484,25 @@ public static class BoatVisuals
         var pin = Attach(root, PrimitiveType.Cylinder, new Vector3(0.014f, 0.07f, 0.014f), Quaternion.Euler(0f, 0f, 90f), Metal, "OarlockPin");
         pin.transform.localPosition = new Vector3(0f, 0.1f, 0.2f);
         AddFitBox(pin);
-        EnableRenderers(root);
+        DipBlade(root, 11f);
+        StripChildColliders(root);
+    }
+
+    static void DipBlade(Transform root, float degrees)
+    {
+        if (root == null)
+            return;
+        Vector3 pivot = new Vector3(0f, 0f, 0.2f);
+        Quaternion dip = Quaternion.Euler(degrees, 0f, 0f);
+        string[] names = { "Shaft", "Neck", "Collar", "Blade" };
+        for (int i = 0; i < names.Length; i++)
+        {
+            Transform t = root.Find(names[i]);
+            if (t == null)
+                continue;
+            t.localPosition = pivot + dip * (t.localPosition - pivot);
+            t.localRotation = dip * t.localRotation;
+        }
     }
 
     public static Transform EnsurePromptAnchor(Transform root, Vector3 localPos)
@@ -460,31 +557,30 @@ public static class BoatVisuals
 
     static void AddFitBox(GameObject go)
     {
-        if (go == null || go.GetComponent<BoxCollider>() != null)
+        if (go == null)
             return;
-        var box = go.AddComponent<BoxCollider>();
+        var box = go.GetComponent<BoxCollider>();
+        if (box == null)
+            box = go.AddComponent<BoxCollider>();
         box.size = Vector3.one;
         box.center = Vector3.zero;
         box.isTrigger = false;
+        box.enabled = true;
         BoatBuildUtil.EnsureCollideWithActors(box);
     }
 
-    static void DisableNamed(Transform root, string name)
-    {
-        Transform t = root.Find(name);
-        if (t != null)
-            t.gameObject.SetActive(false);
-    }
-
-    static void EnableRenderers(Transform root)
+    public static void StripChildColliders(Transform root)
     {
         if (root == null)
             return;
-        var rs = root.GetComponentsInChildren<Renderer>(true);
-        for (int i = 0; i < rs.Length; i++)
+        var cols = root.GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < cols.Length; i++)
         {
-            if (rs[i] != null)
-                rs[i].enabled = true;
+            if (cols[i] == null || cols[i].transform == root)
+                continue;
+            if (cols[i].transform.name.StartsWith("Oarlock", System.StringComparison.Ordinal))
+                continue;
+            Retire(cols[i]);
         }
     }
 }

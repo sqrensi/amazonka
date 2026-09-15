@@ -23,6 +23,13 @@ public class BoatPiece : MonoBehaviour, IInteractable
     static readonly HashSet<BoatPiece> IslandSeen = new HashSet<BoatPiece>();
     static readonly Collider[] OverlapScratch = new Collider[48];
 
+    public float Strain { get; internal set; }
+    public float HullLift { get; internal set; } = 1f;
+    public float HullSink { get; internal set; }
+    public float HullStrength { get; internal set; } = 1f;
+    public float HullFlood { get; internal set; }
+    public bool HullIsCraft { get; internal set; }
+
     public BoatPieceKind Kind => kind;
     public Rigidbody Body => _rb;
     public Vector3 PieceSize => pieceSize;
@@ -230,7 +237,10 @@ public class BoatPiece : MonoBehaviour, IInteractable
     {
         kind = k;
         pieceSize = size;
-        _colCenter = kind == BoatPieceKind.Oar ? new Vector3(0f, 0f, pieceSize.z * 0.5f) : Vector3.zero;
+        transform.localScale = Vector3.one;
+        _colCenter = kind == BoatPieceKind.Oar
+            ? new Vector3(0f, 0f, pieceSize.z * 0.5f)
+            : Vector3.zero;
         ApplyVisual();
         ApplyPhysics();
     }
@@ -248,7 +258,9 @@ public class BoatPiece : MonoBehaviour, IInteractable
         {
             kind = _spawnKind;
             pieceSize = _spawnSize;
-            _colCenter = kind == BoatPieceKind.Oar ? new Vector3(0f, 0f, pieceSize.z * 0.5f) : Vector3.zero;
+            _colCenter = kind == BoatPieceKind.Oar
+                ? new Vector3(0f, 0f, pieceSize.z * 0.5f)
+                : Vector3.zero;
             _spawnPending = false;
         }
         _rb = GetComponent<Rigidbody>();
@@ -260,6 +272,7 @@ public class BoatPiece : MonoBehaviour, IInteractable
     {
         if (_rb == null || _rb.isKinematic)
             return;
+        BoatHull.Tick(this, Time.fixedDeltaTime);
         if (!BoatWater.TryHeight(transform.position, out float waterY))
         {
             _rb.angularDamping = 0.7f;
@@ -273,7 +286,7 @@ public class BoatPiece : MonoBehaviour, IInteractable
         float hz = Mathf.Max(0.04f, size.z * 0.45f);
         float[] xs = { -hx * 0.55f, hx * 0.55f };
         float[] zs = { -hz * 0.4f, hz * 0.4f };
-        float buoyancy = BoatVisuals.Buoyancy(kind);
+        float buoyancy = BoatVisuals.Buoyancy(kind) * Mathf.Max(0.08f, HullLift);
         float submerged = 0f;
         int wet = 0;
         const int sampleCount = 4;
@@ -300,6 +313,8 @@ public class BoatPiece : MonoBehaviour, IInteractable
             return;
 
         _rb.AddForce(liftSum, ForceMode.Force);
+        if (HullSink > 0.01f)
+            _rb.AddForce(Vector3.down * (HullSink * _rb.mass * Mathf.Clamp01(frac + 0.15f)), ForceMode.Force);
 
         Vector3 vel = _rb.linearVelocity;
         Vector3 drag = vel;
@@ -793,9 +808,14 @@ public class BoatPiece : MonoBehaviour, IInteractable
         _rb.collisionDetectionMode = kind == BoatPieceKind.Plank || kind == BoatPieceKind.Log
             ? CollisionDetectionMode.ContinuousDynamic
             : CollisionDetectionMode.ContinuousSpeculative;
-        _rb.linearDamping = 0.45f;
-        _rb.angularDamping = 0.7f;
-        _rb.maxDepenetrationVelocity = 1.8f;
+        _rb.linearDamping = kind == BoatPieceKind.Plank || kind == BoatPieceKind.Log ? 1.1f : 0.45f;
+        _rb.angularDamping = kind == BoatPieceKind.Oar ? 2.4f : 2.2f;
+        _rb.maxDepenetrationVelocity = 0.45f;
+        _rb.automaticCenterOfMass = false;
+        if (kind == BoatPieceKind.Oar)
+            _rb.centerOfMass = new Vector3(0f, -0.12f, 0.22f);
+        else
+            _rb.centerOfMass = _box.center;
         _rb.detectCollisions = true;
         _rb.isKinematic = false;
         _rb.useGravity = true;
@@ -811,13 +831,23 @@ public class BoatPiece : MonoBehaviour, IInteractable
             return _woodPhys;
         _woodPhys = new PhysicsMaterial("BoatWood")
         {
-            dynamicFriction = 0.88f,
-            staticFriction = 0.98f,
+            dynamicFriction = 0.95f,
+            staticFriction = 1f,
             bounciness = 0f,
             frictionCombine = PhysicsMaterialCombine.Maximum,
             bounceCombine = PhysicsMaterialCombine.Minimum
         };
         return _woodPhys;
+    }
+
+    void OnCollisionEnter(Collision collision)
+    {
+        BoatHull.Impact(this, collision);
+    }
+
+    void OnJointBreak(float _)
+    {
+        BoatHull.JointBroke(this);
     }
 
     public static string KindName(BoatPieceKind k)

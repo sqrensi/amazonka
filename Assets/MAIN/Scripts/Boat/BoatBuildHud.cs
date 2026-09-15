@@ -8,6 +8,7 @@ public class BoatBuildHud : MonoBehaviour
 {
     static BoatBuildHud _instance;
     Text _label;
+    Text _hull;
     float _until;
 
     public static void Clear()
@@ -78,6 +79,25 @@ public class BoatBuildHud : MonoBehaviour
         ol.effectColor = new Color(0.05f, 0.08f, 0.04f, 0.5f);
         ol.effectDistance = new Vector2(1.2f, -1.2f);
         _label.text = "";
+
+        var hullGo = new GameObject("Hull", typeof(RectTransform));
+        hullGo.transform.SetParent(canvasGo.transform, false);
+        var hullRt = hullGo.GetComponent<RectTransform>();
+        hullRt.anchorMin = new Vector2(0.5f, 0.055f);
+        hullRt.anchorMax = new Vector2(0.5f, 0.055f);
+        hullRt.sizeDelta = new Vector2(900, 32);
+        _hull = hullGo.AddComponent<Text>();
+        _hull.font = HorrorPaperUI.Font();
+        _hull.fontSize = 18;
+        _hull.fontStyle = FontStyle.Bold;
+        _hull.alignment = TextAnchor.MiddleCenter;
+        _hull.color = new Color(0.82f, 0.92f, 1f, 0.92f);
+        _hull.raycastTarget = false;
+        _hull.supportRichText = true;
+        var hol = hullGo.AddComponent<Outline>();
+        hol.effectColor = new Color(0.04f, 0.06f, 0.1f, 0.5f);
+        hol.effectDistance = new Vector2(1.1f, -1.1f);
+        _hull.text = "";
     }
 
     void Show(string text, float seconds)
@@ -96,9 +116,11 @@ public class BoatBuildHud : MonoBehaviour
         {
             _label.text = "";
             _until = 0f;
-            return;
         }
-        if (Time.unscaledTime > _until)
+        else if (Time.unscaledTime > _until)
             _label.text = "";
+
+        if (_hull != null)
+            _hull.text = BoatHull.PlayerStatus(gameObject);
     }
 }

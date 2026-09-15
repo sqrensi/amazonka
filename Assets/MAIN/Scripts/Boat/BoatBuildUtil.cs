@@ -289,8 +289,23 @@ public static class BoatBuildUtil
 
     public static Collider SolidCollider(BoatPiece piece)
     {
+        return SnapCollider(piece);
+    }
+
+    public static Collider SnapCollider(BoatPiece piece)
+    {
         if (piece == null)
             return null;
+        if (piece.Kind == BoatPieceKind.Oar)
+        {
+            Transform plate = piece.transform.Find("OarlockPlate");
+            if (plate != null)
+            {
+                var lockCol = plate.GetComponent<Collider>();
+                if (lockCol != null && lockCol.enabled)
+                    return lockCol;
+            }
+        }
         var cols = piece.GetComponents<Collider>();
         for (int i = 0; i < cols.Length; i++)
         {
@@ -357,7 +372,17 @@ public static class BoatBuildUtil
 
             BoatPiece mover = b;
             Vector3 delta = gap;
-            if (b.IsLockedInBoat() && !a.IsLockedInBoat())
+            if (a.Kind == BoatPieceKind.Oar)
+            {
+                mover = a;
+                delta = -gap;
+            }
+            else if (b.Kind == BoatPieceKind.Oar)
+            {
+                mover = b;
+                delta = gap;
+            }
+            else if (b.IsLockedInBoat() && !a.IsLockedInBoat())
             {
                 mover = a;
                 delta = -gap;
@@ -391,7 +416,7 @@ public static class BoatBuildUtil
                     break;
                 }
             }
-            if (stayInIsland)
+            if (stayInIsland || mover.Kind == BoatPieceKind.Oar)
                 mover.transform.position += delta;
             else
                 MoveCluster(moveIsland, delta);
@@ -399,6 +424,10 @@ public static class BoatBuildUtil
 
         StopMotion(a.Body);
         StopMotion(b.Body);
+        if (a.Kind == BoatPieceKind.Oar)
+            a.transform.localScale = Vector3.one;
+        if (b.Kind == BoatPieceKind.Oar)
+            b.transform.localScale = Vector3.one;
         Physics.SyncTransforms();
     }
 
@@ -418,7 +447,7 @@ public static class BoatBuildUtil
         var rb = piece.Body;
         if (rb != null)
         {
-            rb.maxDepenetrationVelocity = 1.2f;
+            rb.maxDepenetrationVelocity = 0.45f;
             StopMotion(rb);
         }
 
@@ -831,7 +860,13 @@ public static class BoatBuildUtil
                 if (dist > best)
                 {
                     best = dist;
-                    push = dir;
+                    if (other != null)
+                    {
+                        push = Vector3.up;
+                        best = Mathf.Min(dist, 0.035f);
+                    }
+                    else
+                        push = dir;
                 }
             }
             if (best <= 0f)

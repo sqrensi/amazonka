@@ -192,12 +192,12 @@ public class BoatMaterialItem : HeldItem
             _ghostPos = Vector3.SmoothDamp(_ghostPos, pos, ref _ghostPosVel, 0.07f, 6f, Time.deltaTime);
             _ghostRot = Quaternion.Slerp(_ghostRot, rot, 1f - Mathf.Exp(-10f * Time.deltaTime));
         }
-        _ghost.transform.SetPositionAndRotation(_ghostPos, _ghostRot);
         if (_ghostPos.y < pos.y)
         {
             _ghostPos.y = pos.y;
-            _ghost.transform.position = _ghostPos;
+            _ghostPosVel.y = 0f;
         }
+        _ghost.transform.SetPositionAndRotation(_ghostPos, _ghostRot);
         SetRenderersHidden(true);
     }
 
@@ -212,6 +212,13 @@ public class BoatMaterialItem : HeldItem
         }
         Vector3 worldC = pos + rot * center;
         supportY = worldC.y - BoatBuildUtil.ProjectExtent(rot, box, Vector3.up);
+        if (kind == BoatPieceKind.Oar)
+        {
+            BoatVisuals.OarGhostBounds(out Vector3 visC, out Vector3 visS);
+            pos = BoatBuildUtil.LiftOrigin(pos, rot, visC, visS, supportY);
+            worldC = pos + rot * visC;
+            supportY = worldC.y - BoatBuildUtil.ProjectExtent(rot, visS, Vector3.up);
+        }
         return true;
     }
 

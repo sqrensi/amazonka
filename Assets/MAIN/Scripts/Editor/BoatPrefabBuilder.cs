@@ -114,6 +114,9 @@ static class BoatPrefabBuilder
             vis = UrpMat("BoatMetal", new Color(0.62f, 0.64f, 0.68f), 0.65f, 0.4f);
 
         StampUrp(item.gameObject, vis);
+        BoatVisuals.StripStaleVisuals(item.transform);
+        if (item is BoatMaterialItem woodItem && woodItem.Kind == BoatPieceKind.Oar)
+            BoatVisuals.ClearChild(item.transform, "Vis");
 
         var so = new SerializedObject(item);
         so.FindProperty("displayName").stringValue = display;

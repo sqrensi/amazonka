@@ -138,9 +138,9 @@ public class BoatNail : MonoBehaviour, IInteractable
 
         _joint = A.gameObject.AddComponent<FixedJoint>();
         _joint.connectedBody = rbB;
-        _joint.breakForce = float.PositiveInfinity;
-        _joint.breakTorque = float.PositiveInfinity;
-        _joint.enableCollision = true;
+        _joint.breakForce = 14000f;
+        _joint.breakTorque = 4000f;
+        _joint.enableCollision = A.Kind != BoatPieceKind.Oar && B.Kind != BoatPieceKind.Oar;
         _joint.enablePreprocessing = true;
         Driven = true;
         Hide();
@@ -173,6 +173,16 @@ public class BoatNail : MonoBehaviour, IInteractable
             Drive();
     }
 
+    public FixedJoint Joint => _joint;
+
+    public void SetBreakLimit(float force, float torque)
+    {
+        if (_joint == null)
+            return;
+        _joint.breakForce = force;
+        _joint.breakTorque = torque;
+    }
+
     void Hide()
     {
         var renderers = GetComponentsInChildren<Renderer>(true);
@@ -189,6 +199,8 @@ public class BoatNail : MonoBehaviour, IInteractable
     void OnJointBreak(float _)
     {
         _joint = null;
+        if (A != null)
+            BoatHull.JointBroke(A);
     }
 
     void OnDestroy()
