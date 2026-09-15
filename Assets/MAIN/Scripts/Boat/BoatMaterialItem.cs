@@ -180,23 +180,7 @@ public class BoatMaterialItem : HeldItem
         }
         EnsureGhost();
         _ghost.SetActive(true);
-        if (!_ghostFollow)
-        {
-            _ghostPos = pos;
-            _ghostRot = rot;
-            _ghostPosVel = Vector3.zero;
-            _ghostFollow = true;
-        }
-        else
-        {
-            _ghostPos = Vector3.SmoothDamp(_ghostPos, pos, ref _ghostPosVel, 0.07f, 6f, Time.deltaTime);
-            _ghostRot = Quaternion.Slerp(_ghostRot, rot, 1f - Mathf.Exp(-10f * Time.deltaTime));
-        }
-        if (_ghostPos.y < pos.y)
-        {
-            _ghostPos.y = pos.y;
-            _ghostPosVel.y = 0f;
-        }
+        BoatBuildUtil.FollowGhost(ref _ghostFollow, ref _ghostPos, ref _ghostPosVel, ref _ghostRot, pos, rot);
         _ghost.transform.SetPositionAndRotation(_ghostPos, _ghostRot);
         SetRenderersHidden(true);
     }

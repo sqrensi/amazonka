@@ -70,6 +70,19 @@ public class BoatNail : MonoBehaviour, IInteractable
         }
     }
 
+    public void SplitSeam()
+    {
+        DisconnectJointKeepState();
+        if (A != null)
+            A.UnregisterNail(this);
+        if (B != null)
+            B.UnregisterNail(this);
+        A = null;
+        B = null;
+        Driven = false;
+        Destroy(gameObject);
+    }
+
     public void DropLoose()
     {
         DisconnectJointKeepState();

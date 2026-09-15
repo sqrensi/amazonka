@@ -186,18 +186,7 @@ public class BoatClusterItem : HeldItem
         }
         EnsureGhost();
         _ghost.SetActive(true);
-        if (!_ghostFollow)
-        {
-            _ghostPos = pos;
-            _ghostRot = rot;
-            _ghostPosVel = Vector3.zero;
-            _ghostFollow = true;
-        }
-        else
-        {
-            _ghostPos = Vector3.SmoothDamp(_ghostPos, pos, ref _ghostPosVel, 0.08f, 5f, Time.deltaTime);
-            _ghostRot = Quaternion.Slerp(_ghostRot, rot, 1f - Mathf.Exp(-9f * Time.deltaTime));
-        }
+        BoatBuildUtil.FollowGhost(ref _ghostFollow, ref _ghostPos, ref _ghostPosVel, ref _ghostRot, pos, rot);
         _ghost.transform.SetPositionAndRotation(_ghostPos, _ghostRot);
         HideHeldMesh();
     }
@@ -205,7 +194,7 @@ public class BoatClusterItem : HeldItem
     bool TryPose(out Vector3 pos, out Quaternion rot)
     {
         rot = _poseRot * Quaternion.Euler(_pitch, _yaw, _roll);
-        return BoatBuildUtil.TryPlacePose(Owner, 6f, _localSize, rot, out pos);
+        return BoatBuildUtil.TryPlacePose(Owner, 6f, _localSize, Vector3.zero, rot, out pos, spanNeighbors: true);
     }
 
     void Place(Vector3 pos, Quaternion rot)

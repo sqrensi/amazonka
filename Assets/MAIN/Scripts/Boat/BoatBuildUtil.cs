@@ -163,8 +163,8 @@ public static class BoatBuildUtil
                 continue;
 
             float candY = col.bounds.max.y;
-            Vector3 sitPos = new Vector3(xz.x, candY + 0.03f, xz.z);
-            Vector3 sitHalf = new Vector3(half.x, 0.035f, half.z);
+            Vector3 sitPos = new Vector3(xz.x, candY, xz.z);
+            Vector3 sitHalf = new Vector3(half.x, 0.08f, half.z);
             int m = Physics.OverlapBoxNonAlloc(sitPos, sitHalf, SitScratch, rot, ~0, QueryTriggerInteraction.Ignore);
             bool rests = false;
             for (int s = 0; s < m; s++)
@@ -239,11 +239,7 @@ public static class BoatBuildUtil
         {
             float thick = Mathf.Min(0.08f, ProjectExtent(rot, size, n) + 0.02f);
             Vector3 worldCenter = at + n * (thick + 0.025f);
-            Vector3 p = worldCenter - rot * localCenter;
-            float supportY = seedY;
-            if (TryBlockedSupportY(at, seedY - 0.12f, rot, size, owner, out float extraY))
-                supportY = Mathf.Max(supportY, extraY);
-            return LiftOrigin(p, rot, localCenter, size, supportY);
+            return worldCenter - rot * localCenter;
         }
 
         Vector3 probe = size;
@@ -252,10 +248,50 @@ public static class BoatBuildUtil
         probe.y = Mathf.Max(size.y, 0.06f);
 
         float sitY = seedY;
-        if (TryBlockedSupportY(at, seedY - 0.15f, rot, probe, owner, out float liftY))
+        if (TrySpanSupportY(at, seedY - 0.2f, rot, probe, owner, out float liftY))
             sitY = Mathf.Max(sitY, liftY);
 
         return LiftOrigin(new Vector3(at.x, sitY, at.z), rot, localCenter, size, sitY);
+    }
+
+    static bool TrySpanSupportY(Vector3 at, float floorY, Quaternion rot, Vector3 size, GameObject ignore, out float topY)
+    {
+        topY = float.NegativeInfinity;
+        bool any = false;
+        Vector3 along = rot * Vector3.forward;
+        float halfLen = Mathf.Max(0.12f, size.z * 0.48f);
+        Vector3 pad = new Vector3(Mathf.Max(0.1f, size.x * 0.85f), size.y, 0.16f);
+        for (int i = -3; i <= 3; i++)
+        {
+            Vector3 p = at + along * (halfLen * i / 3f);
+            if (!TryBlockedSupportY(p, floorY, rot, pad, ignore, out float y))
+                continue;
+            if (!any || y > topY)
+            {
+                topY = y;
+                any = true;
+            }
+        }
+        if (TryBlockedSupportY(at, floorY, rot, size, ignore, out float mid))
+        {
+            topY = any ? Mathf.Max(topY, mid) : mid;
+            any = true;
+        }
+        return any;
+    }
+
+    public static void FollowGhost(ref bool ready, ref Vector3 pos, ref Vector3 vel, ref Quaternion rot, Vector3 targetPos, Quaternion targetRot)
+    {
+        if (!ready)
+        {
+            pos = targetPos;
+            rot = targetRot;
+            vel = Vector3.zero;
+            ready = true;
+            return;
+        }
+        pos = Vector3.SmoothDamp(pos, targetPos, ref vel, 0.22f, Mathf.Infinity, Time.deltaTime);
+        rot = Quaternion.Slerp(rot, targetRot, 1f - Mathf.Exp(-4.2f * Time.deltaTime));
     }
 
     public static Vector3 LiftOrigin(Vector3 pos, Quaternion rot, Vector3 localCenter, Vector3 size, float supportY)

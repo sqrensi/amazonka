@@ -314,7 +314,7 @@ public static class BoatHull
         }
         if (a != null)
             a.Strain = Mathf.Clamp01(a.Strain + 0.1f);
-        BoatBuildHud.Hint("A nail gave way", 1.8f);
-        nail.DropLoose();
+        BoatBuildHud.Hint("Hull breaking up", 1.8f);
+        nail.SplitSeam();
     }
 }
