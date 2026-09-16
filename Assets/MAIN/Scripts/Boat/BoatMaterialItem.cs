@@ -62,7 +62,13 @@ public class BoatMaterialItem : HeldItem
         if (box == null)
             box = gameObject.AddComponent<BoxCollider>();
         box.size = WorldSize;
-        box.center = kind == BoatPieceKind.Oar ? new Vector3(0f, 0f, WorldSize.z * 0.5f) : Vector3.zero;
+        box.center = Vector3.zero;
+        if (kind == BoatPieceKind.Oar)
+        {
+            BoatVisuals.PlaceBox(kind, WorldSize, out Vector3 c, out Vector3 s);
+            box.center = c;
+            box.size = s;
+        }
         box.isTrigger = false;
     }
 

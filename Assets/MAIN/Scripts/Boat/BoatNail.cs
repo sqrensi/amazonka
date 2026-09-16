@@ -72,14 +72,20 @@ public class BoatNail : MonoBehaviour, IInteractable
 
     public void SplitSeam()
     {
+        BoatPiece a = A;
+        BoatPiece b = B;
         DisconnectJointKeepState();
-        if (A != null)
-            A.UnregisterNail(this);
-        if (B != null)
-            B.UnregisterNail(this);
+        if (a != null)
+            a.UnregisterNail(this);
+        if (b != null)
+            b.UnregisterNail(this);
         A = null;
         B = null;
         Driven = false;
+        if (a != null && a.Kind == BoatPieceKind.Oar)
+            BoatOarStation.AbortIfIsland(a, "Oar came off");
+        else if (b != null && b.Kind == BoatPieceKind.Oar)
+            BoatOarStation.AbortIfIsland(b, "Oar came off");
         Destroy(gameObject);
     }
 

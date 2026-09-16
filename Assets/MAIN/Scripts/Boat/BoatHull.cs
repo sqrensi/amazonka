@@ -42,19 +42,21 @@ public static class BoatHull
         float speed = collision.relativeVelocity.magnitude;
         float impulse = collision.impulse.magnitude;
         float hit = Mathf.Max(speed * 0.045f, impulse * 0.012f);
+        if (speed > 5.5f || hit > 0.13f)
+            BoatOarStation.AbortIfIsland(piece, "Thrown from the oar");
         if (hit < 0.018f)
             return;
         hit = Mathf.Clamp(hit, 0.018f, 0.28f);
 
-        piece.Strain = Mathf.Clamp01(piece.Strain + hit);
+        piece.Strain = Mathf.Clamp01(piece.Strain + hit * 0.55f);
         var lead = piece.IslandLeader();
         if (lead != null && lead != piece)
-            lead.Strain = Mathf.Clamp01(lead.Strain + hit * 0.35f);
-        if (lead != null)
-            lead.HullFlood = Mathf.Clamp01(lead.HullFlood + hit * 0.4f);
+            lead.Strain = Mathf.Clamp01(lead.Strain + hit * 0.2f);
+        if (lead != null && hit > 0.14f)
+            lead.HullFlood = Mathf.Clamp01(lead.HullFlood + (hit - 0.14f) * 0.18f);
 
-        if (hit > 0.1f)
-            FailWeakestNail(piece, 0.55f);
+        if (hit > 0.16f)
+            FailWeakestNail(piece, 0.35f);
         if (hit > 0.18f)
             BoatBuildHud.Hint("Impact — seams opening", 1.6f);
         else if (hit > 0.08f)
@@ -194,18 +196,18 @@ public static class BoatHull
         bool craft = hull >= 2 || nails > 0;
         lead.HullIsCraft = craft;
         float build = craft
-            ? Mathf.Clamp01(0.5f * joints + 0.32f * material + 0.18f * compact)
+            ? Mathf.Clamp01(0.55f * joints + 0.25f * material + 0.2f * compact)
             : 0.55f * material;
 
         float avgStrain = strain / Mathf.Max(1, Scratch.Count);
-        float strength = Mathf.Clamp01(build * (1f - avgStrain * 0.88f));
+        float strength = Mathf.Clamp01(build * (1f - avgStrain * 0.55f));
 
         float speed2 = vel.sqrMagnitude;
-        float wear = dt * (0.00011f + 0.0005f * speed2 + 0.00028f * ang * ang);
-        wear *= Mathf.Lerp(1.65f, 0.65f, joints);
+        float wear = dt * (0.000002f + 0.000012f * speed2 + 0.000008f * ang * ang);
+        wear *= Mathf.Lerp(1.35f, 0.7f, joints);
         if (!wet)
-            wear *= 0.12f;
-        wear *= Mathf.Lerp(1.35f, 0.85f, material);
+            wear *= 0.08f;
+        wear *= Mathf.Lerp(1.2f, 0.85f, material);
 
         for (int i = 0; i < Scratch.Count; i++)
         {
@@ -216,19 +218,15 @@ public static class BoatHull
             p.Strain = Mathf.Clamp01(p.Strain + wear * k);
         }
 
-        float leak = Mathf.Pow(1f - strength, 1.65f) * 0.2f
-                     + (1f - joints) * 0.07f
-                     + avgStrain * 0.045f;
+        float leak = LeakRate(strength, lead.HullFlood);
         if (wet && craft)
-        {
             lead.HullFlood = Mathf.Clamp01(lead.HullFlood + leak * dt);
-            if (lead.HullFlood > 0.04f)
-                lead.HullFlood = Mathf.Clamp01(lead.HullFlood + lead.HullFlood * 0.012f * dt);
-        }
         else if (!wet && lead.HullFlood > 0f)
-            lead.HullFlood = Mathf.Max(0f, lead.HullFlood - dt * 0.008f);
+            lead.HullFlood = Mathf.Max(0f, lead.HullFlood - dt * 0.02f);
+        if (lead.HullFlood >= 0.2f)
+            BoatOarStation.AbortIfIsland(lead, "Boat is flooding");
 
-        float lift = (1f - lead.HullFlood * 0.92f) * Mathf.Lerp(1f, 0.38f, avgStrain);
+        float lift = 1f - lead.HullFlood * 0.92f;
         float sink = lead.HullFlood * 16f;
         for (int i = 0; i < Scratch.Count; i++)
         {
@@ -253,10 +251,21 @@ public static class BoatHull
                 p.Nails[n]?.SetBreakLimit(breakF, breakT);
         }
 
-        if (craft && wet && strength < 0.28f && Random.value < dt * 0.12f)
+        if (craft && wet && strength < 0.22f && Random.value < dt * 0.025f)
             FailWeakestNail(lead, 1f);
-        if (craft && lead.HullFlood > 0.7f && Random.value < dt * 0.2f)
+        if (craft && lead.HullFlood > 0.75f && Random.value < dt * 0.04f)
             FailWeakestNail(lead, 1f);
+    }
+
+    static float LeakRate(float strength, float flood)
+    {
+        if (strength >= 0.52f)
+            return 0f;
+        float fail = Mathf.InverseLerp(0.52f, 0.08f, strength);
+        float rate = Mathf.Pow(fail, 2.4f) * 0.0075f;
+        if (flood > 0.2f && strength < 0.32f)
+            rate += flood * 0.0035f;
+        return rate;
     }
 
     static float MaterialScore(BoatPieceKind kind)
@@ -309,11 +318,11 @@ public static class BoatHull
         var lead = a != null ? a.IslandLeader() : null;
         if (lead != null)
         {
-            lead.HullFlood = Mathf.Clamp01(lead.HullFlood + 0.08f);
-            lead.Strain = Mathf.Clamp01(lead.Strain + 0.06f);
+            lead.HullFlood = Mathf.Clamp01(lead.HullFlood + 0.035f);
+            lead.Strain = Mathf.Clamp01(lead.Strain + 0.04f);
         }
         if (a != null)
-            a.Strain = Mathf.Clamp01(a.Strain + 0.1f);
+            a.Strain = Mathf.Clamp01(a.Strain + 0.06f);
         BoatBuildHud.Hint("Hull breaking up", 1.8f);
         nail.SplitSeam();
     }

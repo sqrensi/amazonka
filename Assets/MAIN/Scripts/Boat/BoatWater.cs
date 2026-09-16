@@ -101,6 +101,82 @@ public class BoatWater : MonoBehaviour
         return true;
     }
 
+    public static bool HeightAt(Vector3 world, out float y)
+    {
+        if (!TryHeight(world, out y))
+            return false;
+        y += Wave(world);
+        return true;
+    }
+
+    public static float Wave(Vector3 world)
+    {
+        float t = Time.time;
+        float x = world.x;
+        float z = world.z;
+        return 0.07f * Mathf.Sin(x * 0.41f + t * 1.05f)
+             + 0.05f * Mathf.Sin(z * 0.33f + t * 0.82f + 0.9f)
+             + 0.03f * Mathf.Sin(x * 0.85f + z * 0.72f + t * 1.65f)
+             + 0.016f * Mathf.Sin(x * 1.55f - z * 1.05f + t * 2.35f);
+    }
+
+    public static Vector3 WaveDrift(Vector3 world)
+    {
+        const float e = 0.35f;
+        float hx = (Wave(world + Vector3.right * e) - Wave(world - Vector3.right * e)) / (2f * e);
+        float hz = (Wave(world + Vector3.forward * e) - Wave(world - Vector3.forward * e)) / (2f * e);
+        return new Vector3(-hx, 0f, -hz) * 7f;
+    }
+
+    public static float ApplyBuoyancy(Rigidbody rb, Transform t, Vector3 localCenter, Vector3 localSize, float buoyancy)
+    {
+        if (rb == null || t == null)
+            return 0f;
+        float hx = Mathf.Max(0.05f, localSize.x * 0.48f);
+        float hy = Mathf.Max(0.03f, localSize.y * 0.5f);
+        float hz = Mathf.Max(0.05f, localSize.z * 0.48f);
+        Vector3[] locals =
+        {
+            localCenter + new Vector3(-hx, -hy * 0.2f, -hz),
+            localCenter + new Vector3(hx, -hy * 0.2f, -hz),
+            localCenter + new Vector3(-hx, -hy * 0.2f, hz),
+            localCenter + new Vector3(hx, -hy * 0.2f, hz),
+            localCenter + new Vector3(0f, -hy * 0.2f, 0f)
+        };
+        int n = locals.Length;
+        int wet = 0;
+        float submerged = 0f;
+        float thick = Mathf.Max(0.1f, localSize.y);
+        for (int i = 0; i < n; i++)
+        {
+            Vector3 world = t.TransformPoint(locals[i]);
+            if (!HeightAt(world, out float waterY))
+                continue;
+            float depth = waterY - world.y;
+            if (depth <= 0f)
+                continue;
+            float d = Mathf.Clamp01(depth / thick);
+            wet++;
+            submerged += d;
+            float lift = rb.mass * buoyancy * d / n;
+            rb.AddForceAtPosition(Vector3.up * lift + WaveDrift(world) * (rb.mass * 0.4f * d / n), world, ForceMode.Force);
+        }
+        if (wet <= 0)
+            return 0f;
+        float frac = submerged / n;
+        Vector3 vel = rb.linearVelocity;
+        Vector3 drag = vel;
+        drag.y *= 0.45f;
+        rb.AddForce(-drag * (0.72f * frac * rb.mass), ForceMode.Force);
+        rb.AddTorque(-rb.angularVelocity * (2.6f * frac), ForceMode.Acceleration);
+        Vector3 straighten = Vector3.Cross(t.up, Vector3.up);
+        rb.AddTorque(straighten * (2.4f * frac), ForceMode.Acceleration);
+        rb.angularDamping = Mathf.Lerp(0.8f, 2.35f, Mathf.Clamp01(frac));
+        if (vel.y > 2.4f)
+            rb.AddForce(Vector3.down * ((vel.y - 2.4f) * rb.mass * 2.4f), ForceMode.Force);
+        return frac;
+    }
+
     public static bool IsUnder(Vector3 world, out float depth)
     {
         if (!TryHeight(world, out float y))

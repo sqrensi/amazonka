@@ -42,11 +42,10 @@ public class BoatPiece : MonoBehaviour, IInteractable
             return "";
         if (CanRow())
             return "Row";
+        if (IsAssembled())
+            return IslandAfloat() ? "" : "Push boat";
         if (!CanBeCarried())
             return "";
-        CollectIsland(IslandTmp);
-        if (IslandTmp.Count > 1)
-            return IslandTmp.Count > 2 ? "Pick up boat" : "Pick up assembly";
         return $"Pick up {KindName(kind)}";
     }
 
@@ -139,6 +138,8 @@ public class BoatPiece : MonoBehaviour, IInteractable
             return false;
         if (CanRow())
             return true;
+        if (IsAssembled())
+            return CanPush(interactor);
         if (!CanBeCarried())
             return false;
         var inv = interactor.GetComponent<PlayerInventory>();
@@ -147,16 +148,16 @@ public class BoatPiece : MonoBehaviour, IInteractable
 
     public void Interact(GameObject interactor)
     {
+        if (CanRow())
+            return;
+        if (IsAssembled())
+        {
+            TryPush(interactor);
+            return;
+        }
         var inv = interactor.GetComponent<PlayerInventory>();
         if (inv == null || !CanBeCarried())
             return;
-
-        CollectIsland(IslandTmp);
-        if (IslandTmp.Count > 1)
-        {
-            BoatClusterItem.TryPickup(IslandTmp, inv);
-            return;
-        }
         CarrySameObject(inv);
     }
 
@@ -207,6 +208,82 @@ public class BoatPiece : MonoBehaviour, IInteractable
         return false;
     }
 
+    public bool SharesIslandWith(BoatPiece other)
+    {
+        if (other == null)
+            return false;
+        if (other == this)
+            return true;
+        CollectIsland(IslandTmp);
+        for (int i = 0; i < IslandTmp.Count; i++)
+        {
+            if (IslandTmp[i] == other)
+                return true;
+        }
+        return false;
+    }
+
+    bool IsAssembled()
+    {
+        CollectIsland(IslandTmp);
+        return IslandTmp.Count > 1;
+    }
+
+    bool CanPush(GameObject interactor)
+    {
+        if (interactor == null || !IsAssembled() || IslandAfloat())
+            return false;
+        return IslandClearance(interactor.transform.position) <= 1f;
+    }
+
+    float IslandClearance(Vector3 from)
+    {
+        CollectIsland(IslandTmp);
+        float best = float.MaxValue;
+        Vector3 probe = from + Vector3.up * 0.35f;
+        for (int i = 0; i < IslandTmp.Count; i++)
+        {
+            var p = IslandTmp[i];
+            if (p == null)
+                continue;
+            var cols = p.GetComponentsInChildren<Collider>();
+            for (int c = 0; c < cols.Length; c++)
+            {
+                if (cols[c] == null || !cols[c].enabled || cols[c].isTrigger)
+                    continue;
+                float d = Vector3.Distance(probe, cols[c].ClosestPoint(probe));
+                if (d < best)
+                    best = d;
+            }
+        }
+        return best;
+    }
+
+    void TryPush(GameObject interactor)
+    {
+        if (interactor == null || !CanPush(interactor))
+            return;
+        Vector3 dir = interactor.transform.forward;
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.0001f)
+            dir = transform.forward;
+        dir.Normalize();
+
+        CollectIsland(IslandTmp);
+        BoatBuildUtil.IgnoreActorsBriefly(IslandTmp, 0.9f);
+        const float speed = 6f;
+        for (int i = 0; i < IslandTmp.Count; i++)
+        {
+            var p = IslandTmp[i];
+            if (p == null || p.Body == null)
+                continue;
+            Vector3 v = dir * speed;
+            v.y = Mathf.Max(p.Body.linearVelocity.y, 0.2f);
+            BoatBuildUtil.SetMotion(p.Body, v, p.Body.angularVelocity * 0.35f);
+        }
+        BoatBuildHud.Hint("Pushed the boat", 1.2f);
+    }
+
     bool CanBeCarried()
     {
         if (GetComponentInParent<BoatClusterItem>() != null)
@@ -238,9 +315,10 @@ public class BoatPiece : MonoBehaviour, IInteractable
         kind = k;
         pieceSize = size;
         transform.localScale = Vector3.one;
-        _colCenter = kind == BoatPieceKind.Oar
-            ? new Vector3(0f, 0f, pieceSize.z * 0.5f)
-            : Vector3.zero;
+        if (kind == BoatPieceKind.Oar)
+            BoatVisuals.PlaceBox(kind, pieceSize, out _colCenter, out _);
+        else
+            _colCenter = Vector3.zero;
         ApplyVisual();
         ApplyPhysics();
     }
@@ -258,9 +336,10 @@ public class BoatPiece : MonoBehaviour, IInteractable
         {
             kind = _spawnKind;
             pieceSize = _spawnSize;
-            _colCenter = kind == BoatPieceKind.Oar
-                ? new Vector3(0f, 0f, pieceSize.z * 0.5f)
-                : Vector3.zero;
+            if (kind == BoatPieceKind.Oar)
+                BoatVisuals.PlaceBox(kind, pieceSize, out _colCenter, out _);
+            else
+                _colCenter = Vector3.zero;
             _spawnPending = false;
         }
         _rb = GetComponent<Rigidbody>();
@@ -273,7 +352,7 @@ public class BoatPiece : MonoBehaviour, IInteractable
         if (_rb == null || _rb.isKinematic)
             return;
         BoatHull.Tick(this, Time.fixedDeltaTime);
-        if (!BoatWater.TryHeight(transform.position, out float waterY))
+        if (!BoatWater.TryHeight(transform.position, out _))
         {
             _rb.angularDamping = 0.7f;
             return;
@@ -281,51 +360,12 @@ public class BoatPiece : MonoBehaviour, IInteractable
 
         Vector3 size = _box != null ? _box.size : pieceSize;
         Vector3 colCenter = _box != null ? _box.center : _colCenter;
-        float hx = Mathf.Max(0.04f, size.x * 0.45f);
-        float hy = Mathf.Max(0.03f, size.y * 0.5f);
-        float hz = Mathf.Max(0.04f, size.z * 0.45f);
-        float[] xs = { -hx * 0.55f, hx * 0.55f };
-        float[] zs = { -hz * 0.4f, hz * 0.4f };
         float buoyancy = BoatVisuals.Buoyancy(kind) * Mathf.Max(0.08f, HullLift);
-        float submerged = 0f;
-        int wet = 0;
-        const int sampleCount = 4;
-        Vector3 liftSum = Vector3.zero;
-        for (int ix = 0; ix < xs.Length; ix++)
-        {
-            for (int iz = 0; iz < zs.Length; iz++)
-            {
-                Vector3 local = colCenter + new Vector3(xs[ix], 0f, zs[iz]);
-                Vector3 world = transform.TransformPoint(local);
-                float depth = waterY - (world.y - hy);
-                if (depth <= 0f)
-                    continue;
-                float d = Mathf.Clamp01(depth / Mathf.Max(0.08f, size.y));
-                submerged += d;
-                wet++;
-                liftSum += Vector3.up * (_rb.mass * buoyancy * d / sampleCount);
-            }
-        }
-        if (wet <= 0)
-            return;
-        float frac = submerged / sampleCount;
+        float frac = BoatWater.ApplyBuoyancy(_rb, transform, colCenter, size, buoyancy);
         if (frac <= 0.001f)
             return;
-
-        _rb.AddForce(liftSum, ForceMode.Force);
         if (HullSink > 0.01f)
             _rb.AddForce(Vector3.down * (HullSink * _rb.mass * Mathf.Clamp01(frac + 0.15f)), ForceMode.Force);
-
-        Vector3 vel = _rb.linearVelocity;
-        Vector3 drag = vel;
-        drag.y *= 0.45f;
-        _rb.AddForce(-drag * (2.2f * frac * _rb.mass), ForceMode.Force);
-        _rb.AddTorque(-_rb.angularVelocity * (5.5f * frac), ForceMode.Acceleration);
-        Vector3 straighten = Vector3.Cross(transform.up, Vector3.up);
-        _rb.AddTorque(straighten * (6f * frac), ForceMode.Acceleration);
-        _rb.angularDamping = Mathf.Lerp(0.7f, 3.2f, Mathf.Clamp01(frac));
-        if (vel.y > 2.2f)
-            _rb.AddForce(Vector3.down * ((vel.y - 2.2f) * _rb.mass * 3f), ForceMode.Force);
     }
 
     public void RegisterNail(BoatNail nail)
@@ -762,6 +802,13 @@ public class BoatPiece : MonoBehaviour, IInteractable
         if (_box == null)
             _box = gameObject.AddComponent<BoxCollider>();
         _box.size = pieceSize;
+        if (kind == BoatPieceKind.Oar)
+        {
+            BoatVisuals.PlaceBox(kind, pieceSize, out Vector3 oarCenter, out Vector3 oarBox);
+            _colCenter = oarCenter;
+            _box.center = oarCenter;
+            _box.size = oarBox;
+        }
         if (kind == BoatPieceKind.Plank)
         {
             Vector3 s = _box.size;
@@ -808,8 +855,8 @@ public class BoatPiece : MonoBehaviour, IInteractable
         _rb.collisionDetectionMode = kind == BoatPieceKind.Plank || kind == BoatPieceKind.Log
             ? CollisionDetectionMode.ContinuousDynamic
             : CollisionDetectionMode.ContinuousSpeculative;
-        _rb.linearDamping = kind == BoatPieceKind.Plank || kind == BoatPieceKind.Log ? 1.1f : 0.45f;
-        _rb.angularDamping = kind == BoatPieceKind.Oar ? 2.4f : 2.2f;
+        _rb.linearDamping = kind == BoatPieceKind.Plank || kind == BoatPieceKind.Log ? 0.32f : 0.28f;
+        _rb.angularDamping = kind == BoatPieceKind.Oar ? 2.8f : 2.6f;
         _rb.maxDepenetrationVelocity = 0.45f;
         _rb.automaticCenterOfMass = false;
         if (kind == BoatPieceKind.Oar)

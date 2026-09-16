@@ -8,15 +8,10 @@ public static class BoatPaddle
 {
     public static float Steer { get; private set; }
 
-    public static void TickSteer(float dt)
+    public static void TickSteer(float dt, float axis)
     {
-        var kb = Keyboard.current;
-        float want = 0f;
-        if (kb != null && kb.qKey.isPressed)
-            want -= 40f;
-        if (kb != null && kb.eKey.isPressed)
-            want += 40f;
-        float speed = want == 0f ? 70f : 95f;
+        float want = Mathf.Clamp(axis, -1f, 1f) * 22f;
+        float speed = Mathf.Abs(axis) > 0.05f ? 70f : 50f;
         Steer = Mathf.MoveTowards(Steer, want, speed * dt);
     }
 

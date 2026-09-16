@@ -2,13 +2,13 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Прибитое весло: R сесть/выйти, ЛКМ вперёд, ПКМ назад, Q/E рулить. Пока гребёшь — без подсказок и без предметов.
+/// Прибитое весло: R сесть/выйти, WASD грести. Пока гребёшь — без подсказок и без предметов.
 /// </summary>
 public class BoatOarStation : MonoBehaviour
 {
     public static BoatOarStation Active { get; private set; }
 
-    static readonly string[] StrokeParts = { "Shaft", "Neck", "Blade", "Collar" };
+    static readonly string[] StrokeParts = { "Shaft", "ShaftCol", "Neck", "Blade", "Collar" };
 
     HorrorFirstPersonController _move;
     BoatPiece _oar;
@@ -24,6 +24,23 @@ public class BoatOarStation : MonoBehaviour
     public static bool IsUsing(BoatPiece oar)
     {
         return Active != null && Active._oar == oar;
+    }
+
+    public static void Abort(string hint = null)
+    {
+        if (Active == null)
+            return;
+        if (!string.IsNullOrEmpty(hint))
+            BoatBuildHud.Hint(hint, 2f);
+        Active.Stop();
+    }
+
+    public static void AbortIfIsland(BoatPiece piece, string hint = null)
+    {
+        if (Active == null || Active._oar == null || piece == null)
+            return;
+        if (piece == Active._oar || piece.SharesIslandWith(Active._oar))
+            Abort(hint);
     }
 
     public static void Toggle(GameObject player, BoatPiece oar)
@@ -101,7 +118,7 @@ public class BoatOarStation : MonoBehaviour
     {
         if (_parts == null || _oar == null)
             return;
-        Quaternion swing = Quaternion.Euler(angle, BoatPaddle.Steer * 0.55f, 0f);
+        Quaternion swing = Quaternion.Euler(angle, BoatPaddle.Steer * 0.35f, 0f);
         for (int i = 0; i < _parts.Length; i++)
         {
             Transform t = _parts[i];
@@ -117,33 +134,40 @@ public class BoatOarStation : MonoBehaviour
     {
         if (_oar == null || !_oar.isActiveAndEnabled)
         {
-            Stop();
+            Abort("Oar came off");
+            return;
+        }
+        if (!_oar.HasDrivenNail())
+        {
+            Abort("Oar came off");
+            return;
+        }
+        if (_oar.HullFlood >= 0.2f)
+        {
+            Abort("Boat is flooding");
             return;
         }
         if (Vector3.Distance(transform.position, _oar.transform.position) > 3.2f)
         {
-            Stop();
+            Abort();
             return;
         }
         if (_move != null && _move.IsSwimming)
         {
-            Stop();
+            Abort();
             return;
         }
 
-        BoatPaddle.TickSteer(Time.deltaTime);
-        var mouse = Mouse.current;
-        bool locked = Cursor.lockState == CursorLockMode.Locked;
-        bool forward = mouse != null && mouse.leftButton.isPressed && locked;
-        bool back = mouse != null && mouse.rightButton.isPressed && locked && !forward;
-        bool rowing = forward || back;
+        Vector2 input = _move != null ? _move.MoveInput : Vector2.zero;
+        BoatPaddle.TickSteer(Time.deltaTime, input.x);
+        bool rowing = Mathf.Abs(input.y) > 0.08f;
         if (rowing)
-            _stroke += Time.deltaTime * 6.4f;
+            _stroke += Time.deltaTime * 11.2f;
         else
-            _stroke = 0f;
-        float amp = 12f;
-        float target = rowing ? Mathf.Sin(_stroke) * amp * (back ? -1f : 1f) : 0f;
-        _angle = Mathf.Lerp(_angle, target, 1f - Mathf.Exp(-14f * Time.deltaTime));
+            _stroke = Mathf.MoveTowards(_stroke, 0f, Time.deltaTime * 4f);
+        float amp = 7.2f;
+        float target = rowing ? Mathf.Sin(_stroke) * amp * Mathf.Sign(input.y) : 0f;
+        _angle = Mathf.Lerp(_angle, target, 1f - Mathf.Exp(-7.5f * Time.deltaTime));
         ApplyStroke(_angle);
     }
 
@@ -151,21 +175,29 @@ public class BoatOarStation : MonoBehaviour
     {
         if (_oar == null)
             return;
-        var mouse = Mouse.current;
-        bool locked = Cursor.lockState == CursorLockMode.Locked;
-        bool forward = mouse != null && mouse.leftButton.isPressed && locked;
-        bool back = mouse != null && mouse.rightButton.isPressed && locked && !forward;
-        if (!forward && !back)
-            return;
-        if (!BoatPaddle.PieceBladeInWater(_oar))
-            return;
+        Vector2 input = _move != null ? _move.MoveInput : Vector2.zero;
         Rigidbody boat = _oar.IslandRootBody();
         if (boat == null)
             return;
-        Transform blade = _oar.transform.Find("Blade");
-        Vector3 at = blade != null ? blade.position : _oar.transform.position;
+
+        Vector3 av = boat.angularVelocity;
+        Vector3 yaw = Vector3.Project(av, Vector3.up);
+        Vector3 roll = av - yaw;
+        boat.AddTorque(-roll * 5.5f, ForceMode.Acceleration);
+
+        if (Mathf.Abs(input.x) > 0.08f)
+            boat.AddTorque(Vector3.up * (input.x * 5.2f), ForceMode.Acceleration);
+
+        if (Mathf.Abs(input.y) < 0.08f)
+            return;
+        if (!BoatPaddle.PieceBladeInWater(_oar))
+            return;
         Vector3 fwd = boat.transform.forward;
-        float sign = back ? -1f : 1f;
-        BoatPaddle.Push(boat, BoatPaddle.SteerDir(fwd) * sign, at, 190f);
+        fwd.y = 0f;
+        if (fwd.sqrMagnitude < 0.0001f)
+            return;
+        fwd.Normalize();
+        float pulse = 0.62f + 0.38f * Mathf.Abs(Mathf.Sin(_stroke));
+        boat.AddForce(fwd * (input.y * 155f * pulse), ForceMode.Force);
     }
 }

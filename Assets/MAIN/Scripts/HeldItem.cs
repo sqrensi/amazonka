@@ -513,6 +513,15 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
             _rb.linearVelocity = Vector3.ClampMagnitude(_rb.linearVelocity, maxSpeed);
         if (_rb.angularVelocity.sqrMagnitude > 80f)
             _rb.angularVelocity = Vector3.ClampMagnitude(_rb.angularVelocity, 9f);
+        if (GetComponent<BoatPiece>() == null)
+        {
+            var box = GetComponent<BoxCollider>();
+            Vector3 size = box != null ? box.size : (_col != null ? _col.bounds.size : Vector3.one * 0.2f);
+            Vector3 center = box != null ? box.center : Vector3.zero;
+            float buoyancy = 18f + Mathf.Clamp(_rb.mass * 4f, 0f, 16f);
+            if (BoatWater.ApplyBuoyancy(_rb, transform, center, size, buoyancy) > 0.02f)
+                return;
+        }
         KeepAboveGround();
     }
 

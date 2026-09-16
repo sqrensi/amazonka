@@ -228,6 +228,51 @@ public class HorrorFirstPersonController : MonoBehaviour
         ApplyBoatFollow();
     }
 
+    void FixedUpdate()
+    {
+        ApplyDeckWeight();
+    }
+
+    void ApplyDeckWeight()
+    {
+        if (!TryBoatDeck(out _, out BoatPiece hull) || hull == null)
+            return;
+        Rigidbody rb = hull.IslandRootBody();
+        if (rb == null)
+            rb = hull.Body;
+        if (rb == null)
+            return;
+        Vector3 feet = transform.position + Vector3.up * 0.06f;
+        Vector3 at = Vector3.Lerp(rb.worldCenterOfMass, feet, 0.14f);
+        float weight = hull.HullIsCraft ? 150f : 95f;
+        rb.AddForceAtPosition(Vector3.down * weight, at, ForceMode.Force);
+        if (MovementLocked || _moveInput.sqrMagnitude < 0.04f)
+            return;
+        Vector3 walk = transform.right * _moveInput.x + transform.forward * _moveInput.y;
+        walk.y = 0f;
+        if (walk.sqrMagnitude < 0.01f)
+            return;
+        walk.Normalize();
+        float k = IsSprinting ? 1.1f : (IsCrouching ? 0.4f : 0.7f);
+        rb.AddForce(-walk * (55f * k) + Vector3.down * (22f * k), ForceMode.Force);
+    }
+
+    void PunchDeck(float downImpulse)
+    {
+        if (downImpulse < 0.5f)
+            return;
+        if (!TryBoatDeck(out _, out BoatPiece hull) || hull == null)
+            return;
+        Rigidbody rb = hull.IslandRootBody();
+        if (rb == null)
+            rb = hull.Body;
+        if (rb == null)
+            return;
+        Vector3 feet = transform.position + Vector3.up * 0.05f;
+        Vector3 at = Vector3.Lerp(rb.worldCenterOfMass, feet, 0.16f);
+        rb.AddForceAtPosition(Vector3.down * downImpulse, at, ForceMode.Impulse);
+    }
+
     public void OnMove(InputValue value) => _moveInput = value.Get<Vector2>();
 
     public void OnLook(InputValue value) => _lookInput = value.Get<Vector2>();
@@ -369,6 +414,7 @@ public class HorrorFirstPersonController : MonoBehaviour
             _coyoteTime = 0.14f;
             if (!_wasGrounded)
             {
+                PunchDeck(Mathf.Clamp(Mathf.Abs(_verticalVelocity) * 0.85f, 3.5f, 12f));
                 _landOffset = -landBob;
                 PlayLandSound(Mathf.Abs(_verticalVelocity), _airborneTime);
                 _jumpedThisAir = false;
@@ -444,6 +490,7 @@ public class HorrorFirstPersonController : MonoBehaviour
             _jumpedThisAir = true;
             _coyoteTime = 0f;
             _stepTimer = 0f;
+            PunchDeck(6.5f);
         }
         else
         {
@@ -1035,6 +1082,7 @@ public class HorrorFirstPersonController : MonoBehaviour
             return;
 
         PlayFootstep();
+        PunchDeck(IsSprinting ? 2.4f : (IsCrouching ? 1.1f : 1.7f));
         _stepTimer = 0f;
         _strideStarted = true;
     }
@@ -1170,10 +1218,18 @@ public class HorrorFirstPersonController : MonoBehaviour
             return;
 
         var item = hit.collider.GetComponentInParent<HeldItem>();
+        var piece = hit.collider.GetComponentInParent<BoatPiece>();
+        if (piece != null && hit.moveDirection.y < -0.18f)
+            return;
+        if (item != null && !item.IsCarried && hit.moveDirection.y < -0.18f)
+        {
+            if (BoatWater.TryHeight(hit.point, out float wy) && hit.point.y < wy + 0.55f)
+                body.AddForceAtPosition(Vector3.down * 220f, hit.point, ForceMode.Force);
+            return;
+        }
         if (item == null || item.IsCarried)
             return;
 
-        // Стоим сверху — не вдавливаем в пол.
         if (hit.moveDirection.y < -0.2f)
             return;
 

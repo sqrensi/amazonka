@@ -76,10 +76,10 @@ public static class BoatVisuals
     {
         switch (kind)
         {
-            case BoatPieceKind.Log: return 6.5f;
-            case BoatPieceKind.Barrel: return 8f;
-            case BoatPieceKind.Oar: return 1.8f;
-            default: return 2.2f;
+            case BoatPieceKind.Log: return 22f;
+            case BoatPieceKind.Barrel: return 18f;
+            case BoatPieceKind.Oar: return 3.2f;
+            default: return 8.5f;
         }
     }
 
@@ -87,10 +87,10 @@ public static class BoatVisuals
     {
         switch (kind)
         {
-            case BoatPieceKind.Barrel: return 52f;
-            case BoatPieceKind.Log: return 38f;
-            case BoatPieceKind.Oar: return 12f;
-            default: return 30f;
+            case BoatPieceKind.Barrel: return 68f;
+            case BoatPieceKind.Log: return 52f;
+            case BoatPieceKind.Oar: return 16f;
+            default: return 42f;
         }
     }
 
@@ -484,8 +484,29 @@ public static class BoatVisuals
         var pin = Attach(root, PrimitiveType.Cylinder, new Vector3(0.014f, 0.07f, 0.014f), Quaternion.Euler(0f, 0f, 90f), Metal, "OarlockPin");
         pin.transform.localPosition = new Vector3(0f, 0.1f, 0.2f);
         AddFitBox(pin);
-        DipBlade(root, 11f);
+        DipBlade(root, OarDipDegrees);
+        FitOarShaftCollider(root);
         StripChildColliders(root);
+    }
+
+    const float OarDipDegrees = 11f;
+
+    static void FitOarShaftCollider(Transform root)
+    {
+        if (root == null)
+            return;
+        ClearChild(root, "ShaftCol");
+        var go = new GameObject("ShaftCol");
+        go.transform.SetParent(root, false);
+        go.transform.localPosition = new Vector3(0f, 0f, 0.2f);
+        go.transform.localRotation = Quaternion.Euler(OarDipDegrees, 0f, 0f);
+        go.transform.localScale = Vector3.one;
+        var box = go.AddComponent<BoxCollider>();
+        box.center = new Vector3(0f, 0f, 0.76f);
+        box.size = new Vector3(0.1f, 0.1f, 1.88f);
+        box.isTrigger = false;
+        box.enabled = true;
+        BoatBuildUtil.EnsureCollideWithActors(box);
     }
 
     static void DipBlade(Transform root, float degrees)
@@ -548,7 +569,7 @@ public static class BoatVisuals
     {
         string[] names =
         {
-            "Shaft", "Neck", "Blade", "Collar", "Handle", "HandleCap",
+            "Shaft", "ShaftCol", "Neck", "Blade", "Collar", "Handle", "HandleCap",
             "OarlockPost", "OarlockPlate", "OarlockForkL", "OarlockForkR", "OarlockPin"
         };
         for (int i = 0; i < names.Length; i++)
@@ -578,7 +599,8 @@ public static class BoatVisuals
         {
             if (cols[i] == null || cols[i].transform == root)
                 continue;
-            if (cols[i].transform.name.StartsWith("Oarlock", System.StringComparison.Ordinal))
+            string n = cols[i].transform.name;
+            if (n.StartsWith("Oarlock", System.StringComparison.Ordinal) || n == "ShaftCol")
                 continue;
             Retire(cols[i]);
         }
