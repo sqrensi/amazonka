@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Цель взаимодействия — то, на что смотрит прицел. Иначе ближайший объект у центра экрана.
+/// Прицел видит только слой взаимодействия и обычные предметы, не физические коллайдеры лодки.
 /// </summary>
 public class PlayerInteractor : MonoBehaviour
 {
@@ -15,6 +15,10 @@ public class PlayerInteractor : MonoBehaviour
     IInteractable _current;
     Component _currentComponent;
     Camera _cam;
+    float _nextCheck;
+    Vector3 _lastPos;
+    Quaternion _lastLook;
+    bool _maskReady;
 
     public IInteractable Current => _current;
     public Component CurrentComponent => _currentComponent;
@@ -29,14 +33,41 @@ public class PlayerInteractor : MonoBehaviour
             gameObject.AddComponent<KillNoticeHUD>();
         if (GetComponent<BoatBuildHud>() == null)
             gameObject.AddComponent<BoatBuildHud>();
+        EnsureMask();
+    }
+
+    void EnsureMask()
+    {
+        if (_maskReady)
+            return;
+        BoatLayers.Ensure();
+        mask = BoatLayers.InteractorMask();
+        _maskReady = true;
     }
 
     void Update()
     {
-        RefreshTarget();
         var kb = Keyboard.current;
         if (kb != null && kb.rKey.wasPressedThisFrame)
             TryRow();
+
+        if (BoatOarStation.Active != null)
+        {
+            _current = null;
+            _currentComponent = null;
+            return;
+        }
+
+        EnsureMask();
+        Transform look = _cam != null ? _cam.transform : transform;
+        bool moved = (transform.position - _lastPos).sqrMagnitude > 0.0008f
+            || Quaternion.Angle(_lastLook, look.rotation) > 0.8f;
+        if (!moved && Time.unscaledTime < _nextCheck)
+            return;
+        _nextCheck = Time.unscaledTime + 0.05f;
+        _lastPos = transform.position;
+        _lastLook = look.rotation;
+        RefreshTarget();
     }
 
     void TryRow()
@@ -48,14 +79,14 @@ public class PlayerInteractor : MonoBehaviour
         }
         if (_current is BoatPiece piece)
             piece.TryRow(gameObject);
+        else if (_current is BoatPart part && part.Piece != null)
+            part.Piece.TryRow(gameObject);
     }
 
     void RefreshTarget()
     {
         _current = null;
         _currentComponent = null;
-        if (BoatOarStation.Active != null)
-            return;
         if (_cam == null)
             _cam = GetComponentInChildren<Camera>();
         if (_cam == null)
@@ -63,35 +94,16 @@ public class PlayerInteractor : MonoBehaviour
 
         Ray ray = _cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
         int hitCount = Physics.RaycastNonAlloc(ray, _hits, pickupRadius + 0.6f, mask, QueryTriggerInteraction.Collide);
-        int bestHit = -1;
-        float bestHitDist = float.MaxValue;
-        for (int i = 0; i < hitCount; i++)
+        if (PickAimed(_hits, hitCount, preferSolid: true, out IInteractable aimed, out Component aimedComp)
+            || PickAimed(_hits, hitCount, preferSolid: false, out aimed, out aimedComp))
         {
-            if (!TryInteractable(_hits[i].collider, out _, out _))
-                continue;
-            if (_hits[i].distance < bestHitDist)
-            {
-                bestHitDist = _hits[i].distance;
-                bestHit = i;
-            }
+            ResolveTarget(aimed, aimedComp, out _current, out _currentComponent);
+            return;
         }
 
-        if (bestHit < 0)
-        {
-            int sphere = Physics.SphereCastNonAlloc(ray, 0.12f, _hits, pickupRadius, mask, QueryTriggerInteraction.Collide);
-            for (int i = 0; i < sphere; i++)
-            {
-                if (!TryInteractable(_hits[i].collider, out _, out _))
-                    continue;
-                if (_hits[i].distance < bestHitDist)
-                {
-                    bestHitDist = _hits[i].distance;
-                    bestHit = i;
-                }
-            }
-        }
-
-        if (bestHit >= 0 && TryInteractable(_hits[bestHit].collider, out IInteractable aimed, out Component aimedComp))
+        int sphere = Physics.SphereCastNonAlloc(ray, 0.12f, _hits, pickupRadius, mask, QueryTriggerInteraction.Collide);
+        if (PickAimed(_hits, sphere, preferSolid: true, out aimed, out aimedComp)
+            || PickAimed(_hits, sphere, preferSolid: false, out aimed, out aimedComp))
         {
             ResolveTarget(aimed, aimedComp, out _current, out _currentComponent);
             return;
@@ -101,13 +113,15 @@ public class PlayerInteractor : MonoBehaviour
         Vector3 aim = _cam.transform.forward;
         Vector3 eye = _cam.transform.position;
         int count = Physics.OverlapSphereNonAlloc(origin, pickupRadius, _buffer, mask, QueryTriggerInteraction.Collide);
+        Collider bestCol = null;
         float bestScore = -1f;
         for (int i = 0; i < count; i++)
         {
-            if (!TryInteractable(_buffer[i], out IInteractable interactable, out Component component))
+            var col = _buffer[i];
+            if (col == null)
                 continue;
-            ResolveTarget(interactable, component, out interactable, out component);
-            Vector3 to = PromptWorld(interactable, component) - eye;
+            Vector3 pt = BoatBuildUtil.ClosestPoint(col, eye);
+            Vector3 to = pt - eye;
             float dist = to.magnitude;
             if (dist < 0.01f || dist > pickupRadius)
                 continue;
@@ -115,45 +129,59 @@ public class PlayerInteractor : MonoBehaviour
             if (align < 0.72f)
                 continue;
             float score = align * 4f - dist * 0.15f;
+            if (col.isTrigger)
+                score -= 0.35f;
             if (score > bestScore)
             {
                 bestScore = score;
-                _current = interactable;
-                _currentComponent = component;
+                bestCol = col;
             }
         }
+        if (bestCol != null && TryHost(bestCol, out IInteractable interactable, out Component component))
+            ResolveTarget(interactable, component, out _current, out _currentComponent);
+    }
+
+    bool PickAimed(RaycastHit[] hits, int count, bool preferSolid, out IInteractable interactable, out Component component)
+    {
+        interactable = null;
+        component = null;
+        int best = -1;
+        float bestDist = float.MaxValue;
+        for (int i = 0; i < count; i++)
+        {
+            var col = hits[i].collider;
+            if (col == null)
+                continue;
+            if (preferSolid && col.isTrigger)
+                continue;
+            if (hits[i].distance < bestDist)
+            {
+                bestDist = hits[i].distance;
+                best = i;
+            }
+        }
+        return best >= 0 && TryHost(hits[best].collider, out interactable, out component);
     }
 
     void ResolveTarget(IInteractable interactable, Component component, out IInteractable resolved, out Component resolvedComp)
     {
         resolved = interactable;
         resolvedComp = component;
-        if (interactable is BoatPiece piece)
+        BoatPiece piece = interactable as BoatPiece;
+        if (piece == null && interactable is BoatPart part)
+            piece = part.Piece;
+        if (piece == null)
+            return;
+        if (!piece.IsLockedInBoat())
+            return;
+        if (piece.IslandRowOar(gameObject) is BoatPiece oar)
         {
-            if (piece.CanRow())
-            {
-                resolved = piece;
-                resolvedComp = piece;
-                return;
-            }
-            var lead = piece.IslandLeader();
-            if (lead != null)
-            {
-                resolved = lead;
-                resolvedComp = lead;
-            }
+            resolved = oar;
+            resolvedComp = oar;
         }
     }
 
-    static Vector3 PromptWorld(IInteractable interactable, Component component)
-    {
-        Transform a = interactable != null ? interactable.GetAnchor() : null;
-        if (a != null)
-            return a.position;
-        return component != null ? component.transform.position : Vector3.zero;
-    }
-
-    bool TryInteractable(Collider col, out IInteractable interactable, out Component component)
+    bool TryHost(Collider col, out IInteractable interactable, out Component component)
     {
         interactable = null;
         component = null;
@@ -163,20 +191,55 @@ public class PlayerInteractor : MonoBehaviour
         if (t == transform || t.IsChildOf(transform))
             return false;
 
-        var behaviours = col.GetComponentsInParent<MonoBehaviour>(true);
-        for (int b = 0; b < behaviours.Length; b++)
+        BoatPart part = col.GetComponent<BoatPart>();
+        if (part != null && part.Piece != null)
         {
-            if (behaviours[b] is not IInteractable candidate)
-                continue;
-            if (!candidate.CanInteract(gameObject))
-                continue;
-            if (string.IsNullOrEmpty(candidate.GetPrompt()))
-                continue;
-            component = behaviours[b];
-            interactable = candidate;
+            var piece = part.Piece;
+            if (!piece.CanInteract(gameObject))
+                return false;
+            if (string.IsNullOrEmpty(piece.GetPrompt()))
+                return false;
+            interactable = piece;
+            component = piece;
             return true;
         }
-        return false;
+
+        InteractLink link = col.GetComponent<InteractLink>();
+        if (link != null && link.Host is IInteractable linked)
+        {
+            if (!linked.CanInteract(gameObject))
+                return false;
+            if (string.IsNullOrEmpty(linked.GetPrompt()))
+                return false;
+            interactable = linked;
+            component = link.Host;
+            return true;
+        }
+
+        Component host = col.GetComponent<BoatNail>();
+        if (host == null)
+            host = col.GetComponent<HeldItem>();
+        if (host == null)
+            host = col.GetComponent<WorldItemPickup>();
+        if (host == null)
+            host = col.GetComponent<BoatPiece>();
+        if (host == null)
+            host = col.GetComponentInParent<BoatNail>();
+        if (host == null)
+            host = col.GetComponentInParent<HeldItem>();
+        if (host == null)
+            host = col.GetComponentInParent<WorldItemPickup>();
+        if (host == null)
+            host = col.GetComponentInParent<BoatPiece>();
+        if (host is not IInteractable candidate)
+            return false;
+        if (!candidate.CanInteract(gameObject))
+            return false;
+        if (string.IsNullOrEmpty(candidate.GetPrompt()))
+            return false;
+        component = host;
+        interactable = candidate;
+        return true;
     }
 
     public void OnInteract(InputValue value)
@@ -185,7 +248,6 @@ public class PlayerInteractor : MonoBehaviour
             return;
         if (BoatOarStation.Active != null)
             return;
-
         if (_current != null && _current.CanInteract(gameObject))
             _current.Interact(gameObject);
     }

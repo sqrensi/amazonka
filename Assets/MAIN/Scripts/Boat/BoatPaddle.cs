@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using System.Collections.Generic;
 
 /// <summary>
 /// Общий толчок лодки веслом: только если лопасть достаёт воду.
@@ -13,6 +14,77 @@ public static class BoatPaddle
         float want = Mathf.Clamp(axis, -1f, 1f) * 22f;
         float speed = Mathf.Abs(axis) > 0.05f ? 70f : 50f;
         Steer = Mathf.MoveTowards(Steer, want, speed * dt);
+    }
+
+    public static Vector3 Flatten(Vector3 v)
+    {
+        v.y = 0f;
+        return v.sqrMagnitude > 0.0001f ? v.normalized : Vector3.zero;
+    }
+
+    public static bool PieceBladeInWater(BoatPiece piece)
+    {
+        if (piece == null)
+            return false;
+        Transform blade = piece.transform.Find("Blade");
+        if (blade == null)
+            return false;
+        var rend = blade.GetComponent<Renderer>();
+        Vector3[] pts = new Vector3[5];
+        if (rend != null)
+        {
+            Bounds b = rend.bounds;
+            pts[0] = b.center;
+            pts[1] = new Vector3(b.min.x, b.min.y, b.min.z);
+            pts[2] = new Vector3(b.max.x, b.min.y, b.min.z);
+            pts[3] = new Vector3(b.min.x, b.min.y, b.max.z);
+            pts[4] = new Vector3(b.max.x, b.min.y, b.max.z);
+        }
+        else
+            pts[0] = blade.position;
+        for (int i = 0; i < pts.Length; i++)
+        {
+            if (rend == null && i > 0)
+                break;
+            if (!BoatWater.HeightAt(pts[i], out float y) && !BoatWater.TryHeight(pts[i], out y))
+                continue;
+            if (pts[i].y <= y + 0.42f)
+                return true;
+        }
+        return false;
+    }
+
+    static readonly List<BoatPiece> Island = new List<BoatPiece>(32);
+
+    public static void PushIsland(BoatPiece any, Vector3 worldForce, ForceMode mode = ForceMode.Force)
+    {
+        if (any == null || worldForce.sqrMagnitude < 0.0001f)
+            return;
+        Rigidbody rb = any.IslandRootBody();
+        if (rb == null || rb.isKinematic)
+            return;
+        rb.AddForce(worldForce, mode);
+    }
+
+    public static void YawIsland(BoatPiece any, float yawAccel)
+    {
+        if (any == null || Mathf.Abs(yawAccel) < 0.01f)
+            return;
+        Rigidbody rb = any.IslandRootBody();
+        if (rb == null || rb.isKinematic)
+            return;
+        rb.AddTorque(Vector3.up * yawAccel, ForceMode.Acceleration);
+    }
+
+    public static void DampIslandYaw(BoatPiece any, float k)
+    {
+        if (any == null || k <= 0f)
+            return;
+        Rigidbody rb = any.IslandRootBody();
+        if (rb == null || rb.isKinematic)
+            return;
+        Vector3 yaw = Vector3.Project(rb.angularVelocity, Vector3.up);
+        rb.AddTorque(-yaw * k, ForceMode.Acceleration);
     }
 
     public static Vector3 SteerDir(Vector3 forward)
@@ -34,20 +106,6 @@ public static class BoatPaddle
         return false;
     }
 
-    public static bool PieceBladeInWater(BoatPiece piece)
-    {
-        if (piece == null)
-            return false;
-        Transform blade = piece.transform.Find("Blade");
-        if (blade != null)
-        {
-            Vector3 p = blade.position;
-            if (BoatWater.TryHeight(p, out float y) && p.y <= y + 0.18f)
-                return true;
-        }
-        return false;
-    }
-
     public static BoatPiece HullUnder(GameObject player)
     {
         if (player == null)
@@ -58,7 +116,7 @@ public static class BoatPaddle
         float bestD = float.MaxValue;
         for (int i = 0; i < hits.Length; i++)
         {
-            var p = hits[i].collider != null ? hits[i].collider.GetComponentInParent<BoatPiece>() : null;
+            var p = hits[i].collider != null ? BoatPart.FromCollider(hits[i].collider) : null;
             if (p == null || p.Kind == BoatPieceKind.Oar)
                 continue;
             if (hits[i].distance < bestD)

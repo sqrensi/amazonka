@@ -5,6 +5,7 @@ using UnityEngine;
 /// </summary>
 public class NailItem : HeldItem
 {
+    protected override bool SinksInWater => true;
     public override void OnEquip()
     {
         base.OnEquip();

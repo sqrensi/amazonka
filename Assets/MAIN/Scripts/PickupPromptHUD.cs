@@ -6,21 +6,47 @@ using UnityEngine.UI;
 /// </summary>
 public class PickupPromptHUD : MonoBehaviour
 {
+    static PickupPromptHUD _hitHud;
+
     PlayerInteractor _interactor;
     Camera _camera;
     GameObject _root;
     RectTransform _panel;
     Text _label;
+    CanvasGroup _hitGroup;
+    RectTransform _hitTicks;
+    float _hitUntil;
 
     void Awake()
     {
         _interactor = GetComponent<PlayerInteractor>();
         _camera = GetComponentInChildren<Camera>();
         Build();
+        _hitHud = this;
     }
+
+    public static void MarkHit()
+    {
+        if (_hitHud == null)
+            return;
+        _hitHud._hitUntil = Time.unscaledTime + 0.16f;
+        if (_hitHud._hitTicks != null)
+            _hitHud._hitTicks.localScale = Vector3.one * 1.18f;
+    }
+
+    void OnDestroy()
+    {
+        if (_hitHud == this)
+            _hitHud = null;
+    }
+
+    Vector3 _screenVel;
+    Vector3 _screenPos;
+    bool _haveScreen;
 
     void LateUpdate()
     {
+        TickHitMark();
         if (_root == null)
             return;
 
@@ -29,6 +55,7 @@ public class PickupPromptHUD : MonoBehaviour
         if (!show)
         {
             _root.SetActive(false);
+            _haveScreen = false;
             return;
         }
 
@@ -36,6 +63,7 @@ public class PickupPromptHUD : MonoBehaviour
         if (anchor == null)
         {
             _root.SetActive(false);
+            _haveScreen = false;
             return;
         }
 
@@ -44,6 +72,7 @@ public class PickupPromptHUD : MonoBehaviour
         if (screen.z <= 0.05f)
         {
             _root.SetActive(false);
+            _haveScreen = false;
             return;
         }
 
@@ -51,12 +80,21 @@ public class PickupPromptHUD : MonoBehaviour
         if (string.IsNullOrEmpty(prompt))
         {
             _root.SetActive(false);
+            _haveScreen = false;
             return;
         }
 
         _root.SetActive(true);
-        float bob = Mathf.Sin(Time.unscaledTime * 3.2f) * 5f;
-        _panel.position = screen + new Vector3(0f, bob, 0f);
+        screen.z = 0f;
+        if (!_haveScreen)
+        {
+            _screenPos = screen;
+            _screenVel = Vector3.zero;
+            _haveScreen = true;
+        }
+        else
+            _screenPos = Vector3.SmoothDamp(_screenPos, screen, ref _screenVel, 0.07f, 2400f, Time.unscaledDeltaTime);
+        _panel.position = _screenPos;
         string key = _interactor.Current.GetInteractKey();
         _label.text = $"<color=#8FFFB0>{key}</color>   {prompt}";
     }
@@ -106,6 +144,55 @@ public class PickupPromptHUD : MonoBehaviour
         _root.SetActive(false);
 
         BuildCrosshair(canvasGo.transform);
+        BuildHitMark(canvasGo.transform);
+    }
+
+    void BuildHitMark(Transform canvas)
+    {
+        var go = new GameObject("HitMark", typeof(RectTransform), typeof(CanvasGroup));
+        go.transform.SetParent(canvas, false);
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = Vector2.zero;
+        rt.sizeDelta = new Vector2(64f, 64f);
+        _hitGroup = go.GetComponent<CanvasGroup>();
+        _hitGroup.alpha = 0f;
+        _hitGroup.blocksRaycasts = false;
+        _hitTicks = rt;
+        Color red = new Color(0.86f, 0.16f, 0.14f, 0.95f);
+        float reach = 8.5f;
+        MakeTick(rt, new Vector2(1f, 1f) * reach, new Vector2(7f, 2.85f), 45f, red);
+        MakeTick(rt, new Vector2(-1f, 1f) * reach, new Vector2(7f, 2.85f), -45f, red);
+        MakeTick(rt, new Vector2(1f, -1f) * reach, new Vector2(7f, 2.85f), -45f, red);
+        MakeTick(rt, new Vector2(-1f, -1f) * reach, new Vector2(7f, 2.85f), 45f, red);
+    }
+
+    static void MakeTick(Transform parent, Vector2 pos, Vector2 size, float zRot, Color color)
+    {
+        var go = new GameObject("Tick", typeof(RectTransform));
+        go.transform.SetParent(parent, false);
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = pos;
+        rt.sizeDelta = size;
+        rt.localEulerAngles = new Vector3(0f, 0f, zRot);
+        var img = go.AddComponent<Image>();
+        img.color = color;
+        img.raycastTarget = false;
+        var outline = go.AddComponent<Outline>();
+        outline.effectColor = new Color(0.18f, 0.02f, 0.02f, 0.4f);
+        outline.effectDistance = new Vector2(1f, -1f);
+    }
+
+    void TickHitMark()
+    {
+        if (_hitGroup == null)
+            return;
+        float left = _hitUntil - Time.unscaledTime;
+        float a = left > 0f ? 1f : Mathf.Clamp01(1f + left / 0.16f);
+        _hitGroup.alpha = a;
+        if (_hitTicks != null)
+            _hitTicks.localScale = Vector3.Lerp(_hitTicks.localScale, Vector3.one, 1f - Mathf.Exp(-18f * Time.unscaledDeltaTime));
     }
 
     void BuildCrosshair(Transform canvas)

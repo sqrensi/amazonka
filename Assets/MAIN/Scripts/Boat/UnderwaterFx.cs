@@ -4,7 +4,8 @@ using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
 
 /// <summary>
-/// Подводный вид. Вход/выход с поверхности сглажены, небо не щёлкает.
+/// Обычный подводный вид. На выходе эффект держится, пока near-clip
+/// режет поверхность — кадр закрыт цветом воды, дно без тумана не мелькает.
 /// </summary>
 [DefaultExecutionOrder(80)]
 public class UnderwaterFx : MonoBehaviour
@@ -12,14 +13,13 @@ public class UnderwaterFx : MonoBehaviour
     [SerializeField] Color waterFog = new Color(0.07f, 0.2f, 0.24f, 1f);
     [SerializeField] Color tint = new Color(0.14f, 0.4f, 0.44f, 0.38f);
     [SerializeField] float fogDensity = 0.07f;
-    [SerializeField] float enterSmooth = 0.22f;
-    [SerializeField] float exitSmooth = 0.32f;
-    [SerializeField] float exitAbove = 0.22f;
+
+    public static bool Covering { get; private set; }
 
     Camera _cam;
-    float _blend;
-    float _blendVel;
     bool _latched;
+    float _fogStart;
+    float _fogEnd;
     bool _fogWas;
     FogMode _fogMode;
     Color _fogColor;
@@ -43,6 +43,14 @@ public class UnderwaterFx : MonoBehaviour
             _cam = Camera.main;
         if (_cam != null)
             _nearClip = _cam.nearClipPlane;
+        var urp = GetComponent<UniversalAdditionalCameraData>();
+        if (urp == null && _cam != null)
+            urp = _cam.GetComponent<UniversalAdditionalCameraData>();
+        if (urp != null)
+        {
+            urp.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
+            urp.antialiasingQuality = AntialiasingQuality.High;
+        }
         BuildUi();
         BuildVolume();
         BuildBubbles();
@@ -51,10 +59,9 @@ public class UnderwaterFx : MonoBehaviour
     void OnDisable()
     {
         RestoreAir();
-        _blend = 0f;
-        _blendVel = 0f;
         _latched = false;
-        ApplyVisuals(0f, 0f);
+        Covering = false;
+        ApplyVisuals(false, 0f, 0f);
     }
 
     void LateUpdate()
@@ -65,23 +72,16 @@ public class UnderwaterFx : MonoBehaviour
         Vector3 pos = _cam.transform.position;
         bool overWater = BoatWater.TryHeight(pos, out float surfaceY);
         float signed = overWater ? surfaceY - pos.y : -999f;
+        float slab = Mathf.Max(_nearClip, 0.08f);
 
         if (overWater && signed > 0.02f)
             _latched = true;
-        else if (!overWater || signed < -exitAbove)
+        else if (!overWater || signed < -slab)
             _latched = false;
 
-        bool want = _latched || (overWater && signed > -0.08f);
-        float target = want ? 1f : 0f;
-        float smooth = target > _blend + 0.01f ? enterSmooth : exitSmooth;
-        _blend = Mathf.SmoothDamp(_blend, target, ref _blendVel, smooth, 4f, Time.deltaTime);
-        if (_blend < 0.001f && target <= 0f)
-        {
-            _blend = 0f;
-            _blendVel = 0f;
-        }
-
-        ApplyVisuals(_blend, signed);
+        bool under = _latched || (overWater && signed > 0.02f);
+        Covering = under;
+        ApplyVisuals(under, signed, slab);
     }
 
     void BuildUi()
@@ -120,7 +120,7 @@ public class UnderwaterFx : MonoBehaviour
 
         _color = profile.Add<ColorAdjustments>(true);
         _color.colorFilter.Override(new Color(0.55f, 0.82f, 0.86f));
-        _color.postExposure.Override(-0.28f);
+        _color.postExposure.Override(0f);
         _color.contrast.Override(6f);
         _color.saturation.Override(-10f);
 
@@ -171,59 +171,49 @@ public class UnderwaterFx : MonoBehaviour
         }
     }
 
-    void ApplyVisuals(float t, float signedDepth)
+    void ApplyVisuals(bool under, float signedDepth, float slab)
     {
-        float vis = SmoothStep(t);
-
-        if (vis > 0.001f)
+        if (under)
             CaptureAir();
         else if (_saved)
             RestoreAir();
 
-        float absDepth = Mathf.Abs(signedDepth);
-        float nearSurface = 1f - Mathf.Clamp01(absDepth / 0.55f);
+        // Выход: глаз уже над водой, меш клипается — закрываем дыру цветом поверхности.
+        float crossing = 0f;
+        if (under && signedDepth < slab)
+            crossing = 1f - Mathf.Clamp01((signedDepth + slab) / (slab + 0.08f));
 
         if (_veil != null)
         {
             Color c = tint;
-            c.a = (tint.a * vis + 0.18f * nearSurface * vis);
-            c.a = Mathf.Clamp01(c.a);
+            c.a = under ? Mathf.Lerp(tint.a, Mathf.Max(tint.a, 0.72f), crossing) : 0f;
             _veil.color = c;
         }
 
         if (_volume != null)
-            _volume.weight = vis;
+            _volume.weight = under ? 1f : 0f;
 
         if (_bubbles != null)
         {
             var emission = _bubbles.emission;
-            emission.rateOverTime = 5f * vis;
-            if (vis > 0.2f && !_bubbles.isPlaying)
+            emission.rateOverTime = under && signedDepth > 0.08f ? 5f : 0f;
+            if (under && signedDepth > 0.08f && !_bubbles.isPlaying)
                 _bubbles.Play();
-            if (vis <= 0.2f && _bubbles.isPlaying)
+            if ((!under || signedDepth <= 0.08f) && _bubbles.isPlaying)
                 _bubbles.Stop(true, ParticleSystemStopBehavior.StopEmitting);
         }
 
-        if (vis <= 0.001f || !_saved)
+        if (!under || !_saved)
             return;
 
         float depth01 = Mathf.Clamp01(Mathf.Max(0f, signedDepth) / 3.5f);
         RenderSettings.fog = true;
         RenderSettings.fogMode = FogMode.ExponentialSquared;
-        RenderSettings.fogColor = Color.Lerp(_fogColor, waterFog, vis);
-        RenderSettings.fogDensity = Mathf.Lerp(_fogDensity < 0.0001f ? 0.003f : _fogDensity, fogDensity + depth01 * 0.03f, vis);
-        RenderSettings.ambientLight = Color.Lerp(_ambient, Color.Lerp(_ambient, waterFog * 1.8f, 0.65f), vis);
+        RenderSettings.fogColor = Color.Lerp(_fogColor, waterFog, 1f);
+        RenderSettings.fogDensity = Mathf.Lerp(_fogDensity < 0.0001f ? 0.003f : _fogDensity, fogDensity + depth01 * 0.03f, 1f);
+        RenderSettings.ambientLight = Color.Lerp(_ambient, Color.Lerp(_ambient, waterFog * 1.8f, 0.65f), 1f);
         if (_cam != null)
-        {
-            _cam.backgroundColor = Color.Lerp(_background, waterFog, vis);
-            _cam.nearClipPlane = Mathf.Lerp(_nearClip, 0.035f, vis);
-        }
-    }
-
-    static float SmoothStep(float x)
-    {
-        x = Mathf.Clamp01(x);
-        return x * x * (3f - 2f * x);
+            _cam.backgroundColor = waterFog;
     }
 
     void CaptureAir()
@@ -234,6 +224,8 @@ public class UnderwaterFx : MonoBehaviour
         _fogMode = RenderSettings.fogMode;
         _fogColor = RenderSettings.fogColor;
         _fogDensity = RenderSettings.fogDensity;
+        _fogStart = RenderSettings.fogStartDistance;
+        _fogEnd = RenderSettings.fogEndDistance;
         _ambient = RenderSettings.ambientLight;
         _background = _cam != null ? _cam.backgroundColor : Color.black;
         if (_cam != null)
@@ -249,12 +241,11 @@ public class UnderwaterFx : MonoBehaviour
         RenderSettings.fogMode = _fogMode;
         RenderSettings.fogColor = _fogColor;
         RenderSettings.fogDensity = _fogDensity;
+        RenderSettings.fogStartDistance = _fogStart;
+        RenderSettings.fogEndDistance = _fogEnd;
         RenderSettings.ambientLight = _ambient;
         if (_cam != null)
-        {
             _cam.backgroundColor = _background;
-            _cam.nearClipPlane = _nearClip;
-        }
         _saved = false;
         if (_volume != null)
             _volume.weight = 0f;

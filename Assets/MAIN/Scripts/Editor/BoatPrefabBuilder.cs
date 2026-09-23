@@ -78,14 +78,15 @@ static class BoatPrefabBuilder
 
     static void StampUrp(GameObject go, Material vis)
     {
-        var metal = UrpMat("BoatMetal", new Color(0.62f, 0.64f, 0.68f), 0.65f, 0.4f);
-        var wood = UrpMat("BoatWood", new Color(0.72f, 0.52f, 0.28f));
+        var metal = BoatVisuals.Metal;
+        var wood = BoatVisuals.Wood;
         foreach (var r in go.GetComponentsInChildren<MeshRenderer>(true))
         {
             string n = r.gameObject.name;
-            if (n == "Handle" || n == "Grip" || n == "Shaft" || n == "Neck" || n == "Blade")
+            if (n == "Handle" || n == "Grip" || n == "Shaft" || n == "Neck")
                 r.sharedMaterial = wood;
-            else if (n == "Head" || n == "Face" || n == "Peen" || n == "Blade" || n == "Spine" || n == "Ferrule" || n.StartsWith("Tooth"))
+            else if (n == "Head" || n == "Face" || n == "Peen" || n == "Blade" || n == "Spine" || n == "Ferrule" || n.StartsWith("Tooth")
+                || n == "Collar" || n.StartsWith("Oarlock") || n == "OarlockPin")
                 r.sharedMaterial = metal;
             else
                 r.sharedMaterial = vis;
@@ -94,24 +95,19 @@ static class BoatPrefabBuilder
 
     static void SaveItem(HeldItem item, string file, string display, int slot)
     {
-        Material vis = UrpMat("BoatWood", new Color(0.72f, 0.52f, 0.28f));
+        Material vis = BoatVisuals.Wood;
         if (item is BoatMaterialItem wood)
         {
-            if (wood.Kind == BoatPieceKind.Log)
-                vis = UrpMat("BoatWoodDark", new Color(0.42f, 0.28f, 0.14f));
-            else if (wood.Kind == BoatPieceKind.Barrel)
-                vis = UrpMat("BoatBarrel", new Color(0.55f, 0.28f, 0.14f));
-            else if (wood.Kind == BoatPieceKind.Oar)
-                vis = UrpMat("BoatWoodDark", new Color(0.42f, 0.28f, 0.14f));
+            vis = BoatVisuals.MaterialFor(wood.Kind);
         }
         else if (item is NailItem)
-            vis = UrpMat("BoatMetal", new Color(0.62f, 0.64f, 0.68f), 0.65f, 0.4f);
+            vis = BoatVisuals.Metal;
         else if (item is RopeItem)
-            vis = UrpMat("BoatRope", new Color(0.7f, 0.58f, 0.32f));
+            vis = BoatVisuals.Rope;
         else if (item is HammerItem)
-            vis = UrpMat("BoatWoodDark", new Color(0.42f, 0.28f, 0.14f));
+            vis = BoatVisuals.WoodDark;
         else if (item is SawItem)
-            vis = UrpMat("BoatMetal", new Color(0.62f, 0.64f, 0.68f), 0.65f, 0.4f);
+            vis = BoatVisuals.Metal;
 
         StampUrp(item.gameObject, vis);
         BoatVisuals.StripStaleVisuals(item.transform);
@@ -136,15 +132,24 @@ static class BoatPrefabBuilder
         Object.DestroyImmediate(item.gameObject);
     }
 
+    static Material WaterSurfaceMat()
+    {
+        var mat = AssetDatabase.LoadAssetAtPath<Material>("Assets/IgniteCoders/Simple Water Shader/Resources/Water_mat_01.mat");
+        if (mat != null)
+            return mat;
+        return UrpMat("BoatWater", new Color(0.18f, 0.48f, 0.72f), 0.05f, 0.85f);
+    }
+
     static void BuildWater()
     {
         var mesh = AssetDatabase.LoadAssetAtPath<Mesh>("Assets/IgniteCoders/Simple Water Shader/Resources/WaterBlock_50m.mesh");
-        var mat = AssetDatabase.LoadAssetAtPath<Material>("Assets/IgniteCoders/Simple Water Shader/Resources/Water_mat_01.mat");
+        var mat = WaterSurfaceMat();
         var go = new GameObject("BoatWater");
+        go.SetActive(false);
         var filter = go.AddComponent<MeshFilter>();
         filter.sharedMesh = mesh;
         var rend = go.AddComponent<MeshRenderer>();
-        rend.sharedMaterial = mat != null ? mat : UrpMat("BoatWater", new Color(0.18f, 0.48f, 0.72f), 0.05f, 0.85f);
+        rend.sharedMaterial = mat;
         rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         Bounds mb = mesh != null ? mesh.bounds : new Bounds(Vector3.zero, new Vector3(50f, 1f, 50f));
         float depth = 14f;
@@ -155,7 +160,14 @@ static class BoatPrefabBuilder
         var water = go.AddComponent<BoatWater>();
         var so = new SerializedObject(water);
         so.FindProperty("surfaceY").floatValue = mb.max.y;
+        var speed = so.FindProperty("flowSpeed");
+        if (speed != null)
+            speed.floatValue = 4.5f;
+        var flow = so.FindProperty("localFlow");
+        if (flow != null)
+            flow.vector3Value = Vector3.forward;
         so.ApplyModifiedPropertiesWithoutUndo();
+        rend.sharedMaterial = mat;
         PrefabUtility.SaveAsPrefabAsset(go, BoatDir + "/BoatWater.prefab");
         Object.DestroyImmediate(go);
     }
@@ -163,16 +175,33 @@ static class BoatPrefabBuilder
     static void BuildKit()
     {
         var root = new GameObject("BoatKit");
-        Scatter(root.transform, "PlankItem", 6, new Vector3(0, 0.2f, 0), 1.1f);
-        Scatter(root.transform, "LogItem", 4, new Vector3(1.4f, 0.25f, 0), 1.3f);
-        Scatter(root.transform, "BarrelItem", 3, new Vector3(-1.5f, 0.35f, 0.4f), 1.2f);
-        Scatter(root.transform, "NailItem", 8, new Vector3(0.4f, 0.1f, 1.2f), 0.7f);
-        Scatter(root.transform, "RopeItem", 3, new Vector3(-0.5f, 0.15f, 1.1f), 0.6f);
-        Place(root.transform, "HammerItem", new Vector3(0.2f, 0.15f, -0.8f));
-        Place(root.transform, "SawItem", new Vector3(-0.3f, 0.15f, -0.8f));
-        Scatter(root.transform, "MountOarItem", 2, new Vector3(-1.2f, 0.2f, -1.0f), 0.5f);
+        ScatterStack(root.transform, "PlankItem", 18, new Vector3(0f, 0.03f, 0f), 3, 0.3f, 0.05f);
+        ScatterStack(root.transform, "LogItem", 10, new Vector3(1.2f, 0.16f, 0f), 5, 0.34f, 0.3f);
+        ScatterStack(root.transform, "BarrelItem", 2, new Vector3(-1.4f, 0.32f, 0.2f), 2, 0.62f, 0.65f);
+        ScatterStack(root.transform, "NailItem", 30, new Vector3(0.2f, 0.08f, 1.2f), 6, 0.13f, 0.1f);
+        ScatterStack(root.transform, "RopeItem", 5, new Vector3(-0.9f, 0.12f, 1.15f), 5, 0.22f, 0.14f);
+        Place(root.transform, "HammerItem", new Vector3(0.35f, 0.08f, -0.9f));
+        Place(root.transform, "SawItem", new Vector3(-0.15f, 0.08f, -0.9f));
+        Place(root.transform, "MountOarItem", new Vector3(-2.0f, 0.1f, 0f));
         PrefabUtility.SaveAsPrefabAsset(root, BoatDir + "/BoatKit.prefab");
         Object.DestroyImmediate(root);
+    }
+
+    static void ScatterStack(Transform parent, string itemFile, int count, Vector3 origin, int cols, float space, float lift)
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(ItemsDir + "/" + itemFile + ".prefab");
+        if (prefab == null)
+            return;
+        int per = Mathf.Max(1, Mathf.CeilToInt(count / (float)cols));
+        for (int i = 0; i < count; i++)
+        {
+            int col = i % cols;
+            int layer = i / cols;
+            var inst = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            inst.transform.SetParent(parent, false);
+            inst.transform.localPosition = origin + new Vector3((col - (cols - 1) * 0.5f) * space, layer * lift, 0f);
+            inst.transform.localRotation = Quaternion.identity;
+        }
     }
 
     static void Scatter(Transform parent, string itemFile, int count, Vector3 origin, float spread)

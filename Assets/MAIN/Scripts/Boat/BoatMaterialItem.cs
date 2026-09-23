@@ -31,6 +31,9 @@ public class BoatMaterialItem : HeldItem
     public BoatPieceKind Kind => kind;
     public Vector3 WorldSize => _worldSize.sqrMagnitude > 0.01f ? _worldSize : BoatVisuals.DefaultSize(kind);
 
+    public override float WaterLift() => BoatVisuals.Buoyancy(kind);
+    public override float WaterCurrent() => BoatVisuals.CurrentScale(kind);
+
     public override Transform GetAnchor()
     {
         if (kind == BoatPieceKind.Oar)
@@ -232,11 +235,11 @@ public class BoatMaterialItem : HeldItem
             transform.SetParent(null, true);
             transform.SetPositionAndRotation(pos, rot);
             gameObject.SetActive(true);
+            BoatPiece.PrepareSpawn(kind, WorldSize);
             var live = gameObject.AddComponent<BoatPiece>();
             live.Configure(kind, WorldSize);
             SetRenderersHidden(false);
-            BoatBuildUtil.ClearIgnoreWithBoat(live);
-            BoatBuildUtil.Settle(live, support);
+            BoatBuildUtil.SoftPlace(live, support);
             Destroy(this);
             return;
         }
@@ -246,8 +249,7 @@ public class BoatMaterialItem : HeldItem
         BoatPiece.PrepareSpawn(kind, WorldSize);
         var piece = go.AddComponent<BoatPiece>();
         piece.Configure(kind, WorldSize);
-        BoatBuildUtil.ClearIgnoreWithBoat(piece);
-        BoatBuildUtil.Settle(piece, support);
+        BoatBuildUtil.SoftPlace(piece, support);
         if (Inventory != null)
             Inventory.DestroyEquipped();
         else
@@ -264,8 +266,10 @@ public class BoatMaterialItem : HeldItem
     {
         if (this == null || GetComponent<BoatPiece>() != null)
             return;
+        BoatPiece.PrepareSpawn(kind, WorldSize);
         var piece = gameObject.AddComponent<BoatPiece>();
         piece.Configure(kind, WorldSize);
+        piece.ThrownByPlayer = WasDroppedByPlayer;
         var pieces = new System.Collections.Generic.List<BoatPiece> { piece };
         BoatBuildUtil.NudgeClusterFromActors(pieces);
         BoatBuildUtil.IgnoreActorsBriefly(pieces, 1.25f);

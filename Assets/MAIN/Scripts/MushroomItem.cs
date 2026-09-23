@@ -5,6 +5,8 @@ using UnityEngine;
 /// </summary>
 public class MushroomItem : HeldItem
 {
+    public override float WaterLift() => 32f;
+    public override float WaterCurrent() => 0.4f;
     public override void OnUseStart()
     {
         if (IsUseBlocked || Inventory == null)
@@ -12,8 +14,9 @@ public class MushroomItem : HeldItem
         Inventory.DestroyEquipped();
     }
 
-    void OnCollisionEnter(Collision collision)
+    protected override void OnCollisionEnter(Collision collision)
     {
+        base.OnCollisionEnter(collision);
         TryKillSlime(collision.collider);
     }
 

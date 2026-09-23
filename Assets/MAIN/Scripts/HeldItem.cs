@@ -86,6 +86,19 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
     public virtual Transform GetAnchor() => transform;
     public virtual string GetInteractKey() => "F";
 
+    protected virtual bool SinksInWater => false;
+
+    public virtual float WaterLift()
+    {
+        if (SinksInWater)
+            return 0f;
+        return 18f + Mathf.Clamp((_rb != null ? _rb.mass : 1f) * 4f, 0f, 16f);
+    }
+
+    public virtual float WaterCurrent() => SinksInWater ? 0.12f : 0.75f;
+
+    public virtual float WaterSink() => SinksInWater ? 18f : 0f;
+
     public bool CanInteract(GameObject interactor)
     {
         if (BoatOarStation.Active != null)
@@ -395,6 +408,17 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
                 _rb.isKinematic = true;
             }
         }
+        BoatLayers.BindPickup(this, on && !_carried);
+    }
+
+    protected virtual void OnCollisionEnter(Collision collision)
+    {
+        if (IsCarried || !WasDroppedByPlayer || collision == null)
+            return;
+        var shark = collision.collider != null
+            ? collision.collider.GetComponentInParent<RiverShark>()
+            : null;
+        shark?.HitByThrown(DisplayName, collision);
     }
 
     static void FitBox(BoxCollider box)
@@ -513,23 +537,71 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
             _rb.linearVelocity = Vector3.ClampMagnitude(_rb.linearVelocity, maxSpeed);
         if (_rb.angularVelocity.sqrMagnitude > 80f)
             _rb.angularVelocity = Vector3.ClampMagnitude(_rb.angularVelocity, 9f);
+        if (RestOnLand())
+            return;
         if (GetComponent<BoatPiece>() == null)
         {
             var box = GetComponent<BoxCollider>();
             Vector3 size = box != null ? box.size : (_col != null ? _col.bounds.size : Vector3.one * 0.2f);
             Vector3 center = box != null ? box.center : Vector3.zero;
-            float buoyancy = 18f + Mathf.Clamp(_rb.mass * 4f, 0f, 16f);
-            if (BoatWater.ApplyBuoyancy(_rb, transform, center, size, buoyancy) > 0.02f)
+            float lift = WaterLift();
+            float follow = WaterCurrent();
+            float frac = BoatWater.ApplyBuoyancy(_rb, transform, center, size, lift, -1f, true, follow);
+            if (frac > 0.02f)
+            {
+                BoatWater.DriftWithCurrent(_rb, frac, follow);
+                float sink = WaterSink();
+                if (sink > 0.01f)
+                    _rb.AddForce(Vector3.down * (sink * _rb.mass * Mathf.Clamp01(frac + 0.2f)), ForceMode.Force);
                 return;
+            }
         }
         KeepAboveGround();
+    }
+
+    bool RestOnLand()
+    {
+        if (_col == null || _rb == null)
+            return false;
+        Vector3 origin = transform.position + Vector3.up * 0.45f;
+        if (!Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 1.2f, ~0, QueryTriggerInteraction.Ignore))
+            return false;
+        if (IsOwnCollider(hit.collider))
+            return false;
+        if (hit.collider.GetComponentInParent<BoatWater>() != null)
+            return false;
+        if (hit.normal.y < 0.45f)
+            return false;
+        float bottom = _col.bounds.min.y;
+        bool close = bottom <= hit.point.y + 0.08f && bottom >= hit.point.y - 0.12f;
+        if (!close)
+            return false;
+        float speed = _rb.linearVelocity.magnitude;
+        float spin = _rb.angularVelocity.magnitude;
+        if (speed > 0.55f || spin > 1.2f)
+        {
+            if (_rb.linearVelocity.y < 0f)
+            {
+                Vector3 v = _rb.linearVelocity;
+                v.y *= 0.25f;
+                _rb.linearVelocity = v;
+            }
+            return false;
+        }
+        float skin = 0.02f;
+        if (bottom < hit.point.y + skin)
+            transform.position += Vector3.up * (hit.point.y + skin - bottom);
+        _rb.linearVelocity = Vector3.zero;
+        _rb.angularVelocity = Vector3.zero;
+        _rb.Sleep();
+        return true;
     }
 
     void KeepAboveGround()
     {
         if (_col == null)
             return;
-        float skin = 0.04f;
+        float skin = 0.03f;
         Vector3 origin = transform.position + Vector3.up * 0.8f;
         var hits = Physics.RaycastAll(origin, Vector3.down, 2.4f, ~0, QueryTriggerInteraction.Ignore);
         float best = float.PositiveInfinity;
@@ -537,6 +609,8 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
         for (int i = 0; i < hits.Length; i++)
         {
             if (IsOwnCollider(hits[i].collider))
+                continue;
+            if (hits[i].collider != null && hits[i].collider.GetComponentInParent<BoatWater>() != null)
                 continue;
             if (hits[i].distance < best)
             {

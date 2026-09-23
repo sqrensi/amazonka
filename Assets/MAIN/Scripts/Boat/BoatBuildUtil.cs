@@ -11,6 +11,25 @@ public static class BoatBuildUtil
         return c != null ? c : Camera.main;
     }
 
+    public static bool SupportsClosestPoint(Collider col)
+    {
+        if (col == null || !col.enabled)
+            return false;
+        if (col is BoxCollider || col is SphereCollider || col is CapsuleCollider)
+            return true;
+        var mesh = col as MeshCollider;
+        return mesh != null && mesh.convex;
+    }
+
+    public static Vector3 ClosestPoint(Collider col, Vector3 point)
+    {
+        if (col == null)
+            return point;
+        if (SupportsClosestPoint(col))
+            return col.ClosestPoint(point);
+        return col.bounds.ClosestPoint(point);
+    }
+
     public static bool Aim(GameObject owner, float dist, out RaycastHit hit, bool preferPieces = false, bool allowPieceSteal = true)
     {
         hit = default;
@@ -93,7 +112,7 @@ public static class BoatBuildUtil
                 Transform t = col.transform;
                 if (owner != null && (t == owner.transform || t.IsChildOf(owner.transform)))
                     continue;
-                Vector3 closest = col.ClosestPoint(probe);
+                Vector3 closest = ClosestPoint(col, probe);
                 float sqr = (closest - probe).sqrMagnitude;
                 if (sqr >= bestSqr)
                     continue;
@@ -360,8 +379,8 @@ public static class BoatBuildUtil
     {
         var ca = SolidCollider(a);
         var cb = SolidCollider(b);
-        Vector3 pa = ca != null ? ca.ClosestPoint(aim) : aim;
-        Vector3 pb = cb != null ? cb.ClosestPoint(aim) : aim;
+        Vector3 pa = ca != null ? ClosestPoint(ca, aim) : aim;
+        Vector3 pb = cb != null ? ClosestPoint(cb, aim) : aim;
         Vector3 outward = hitNormal.sqrMagnitude > 0.01f ? hitNormal.normalized : Vector3.up;
         if (ca != null)
         {
@@ -397,10 +416,10 @@ public static class BoatBuildUtil
                 && overlap > 0.0004f)
                 break;
 
-            Vector3 pA = ca.ClosestPoint(aim);
-            Vector3 pB = cb.ClosestPoint(pA);
-            pA = ca.ClosestPoint(pB);
-            pB = cb.ClosestPoint(pA);
+            Vector3 pA = ClosestPoint(ca, aim);
+            Vector3 pB = ClosestPoint(cb, pA);
+            pA = ClosestPoint(ca, pB);
+            pB = ClosestPoint(cb, pA);
             Vector3 gap = pA - pB;
             float dist = gap.magnitude;
             if (dist < 0.0015f || dist > 0.85f)
@@ -473,6 +492,23 @@ public static class BoatBuildUtil
             return;
         Vector3 aim = (a.transform.position + b.transform.position) * 0.5f;
         SnapTogether(a, b, aim);
+    }
+
+    public static void SoftPlace(BoatPiece piece, Collider support)
+    {
+        if (piece == null)
+            return;
+        ClearIgnoreWithBoat(piece);
+        Settle(piece, support);
+        var list = new System.Collections.Generic.List<BoatPiece>(1) { piece };
+        NudgeClusterFromActors(list);
+        IgnoreActorsBriefly(list, 1.8f);
+        var rb = piece.Body;
+        if (rb != null)
+        {
+            rb.maxDepenetrationVelocity = 0.28f;
+            StopMotion(rb);
+        }
     }
 
     public static void Settle(BoatPiece piece, Collider support)

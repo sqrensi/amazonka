@@ -82,11 +82,23 @@ public class BoatNail : MonoBehaviour, IInteractable
         A = null;
         B = null;
         Driven = false;
-        if (a != null && a.Kind == BoatPieceKind.Oar)
-            BoatOarStation.AbortIfIsland(a, "Oar came off");
-        else if (b != null && b.Kind == BoatPieceKind.Oar)
-            BoatOarStation.AbortIfIsland(b, "Oar came off");
+        DetachOarIfLoose(a);
+        DetachOarIfLoose(b);
         Destroy(gameObject);
+        if (a != null)
+            BoatIsland.Refresh(a);
+        if (b != null && b != a)
+            BoatIsland.Refresh(b);
+    }
+
+    static void DetachOarIfLoose(BoatPiece piece)
+    {
+        if (piece == null || piece.Kind != BoatPieceKind.Oar)
+            return;
+        if (piece.OarIsMounted())
+            return;
+        piece.ReleaseOarLatch();
+        BoatOarStation.AbortIfIsland(piece, "Oar came off");
     }
 
     public void DropLoose()
@@ -141,28 +153,21 @@ public class BoatNail : MonoBehaviour, IInteractable
     {
         if (Driven || A == null || B == null)
             return;
-        var rbA = A.Body;
-        var rbB = B.Body;
-        if (rbA == null || rbB == null)
-            return;
 
         if (_joint != null)
-            Destroy(_joint);
+        {
+            Object.DestroyImmediate(_joint);
+            _joint = null;
+        }
 
         BoatBuildUtil.SnapTogether(A, B, Aim);
-        if (rbA != null)
-            BoatBuildUtil.StopMotion(rbA);
-        if (rbB != null)
-            BoatBuildUtil.StopMotion(rbB);
+        BoatBuildUtil.StopMotion(A.Body);
+        BoatBuildUtil.StopMotion(B.Body);
 
-        _joint = A.gameObject.AddComponent<FixedJoint>();
-        _joint.connectedBody = rbB;
-        _joint.breakForce = 14000f;
-        _joint.breakTorque = 4000f;
-        _joint.enableCollision = A.Kind != BoatPieceKind.Oar && B.Kind != BoatPieceKind.Oar;
-        _joint.enablePreprocessing = true;
         Driven = true;
+        BoatLayers.BindPickup(this, false);
         Hide();
+        BoatIsland.Refresh(A);
     }
 
     public void RebuildJoint()
@@ -200,6 +205,12 @@ public class BoatNail : MonoBehaviour, IInteractable
             return;
         _joint.breakForce = force;
         _joint.breakTorque = torque;
+    }
+
+    void OnEnable()
+    {
+        if (!Driven)
+            BoatLayers.BindPickup(this, true);
     }
 
     void Hide()

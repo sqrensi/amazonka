@@ -5,6 +5,8 @@ using UnityEngine;
 /// </summary>
 public class RopeItem : HeldItem
 {
+    public override float WaterLift() => 24f;
+    public override float WaterCurrent() => 1.25f;
     BoatPiece _startPiece;
     Vector3 _startPoint;
 
@@ -50,6 +52,8 @@ public class RopeItem : HeldItem
         var go = new GameObject("Rope");
         var rope = go.AddComponent<BoatRope>();
         rope.Bind(_startPiece, _startPoint, piece, hit.point);
+        BoatIsland.Refresh(_startPiece);
+        BoatIsland.Refresh(piece);
         _startPiece = null;
         Inventory?.DestroyEquipped();
         BoatBuildHud.Hint("Rope tied");

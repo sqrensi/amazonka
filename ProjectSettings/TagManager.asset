@@ -11,9 +11,9 @@ TagManager:
   - buildings
   - Water
   - UI
-  - 
-  - 
-  - 
+  - BoatPhysics
+  - BoatInteract
+  - BoatLoose
   - 
   - 
   - 

@@ -16,11 +16,17 @@ public static class BoatVisuals
     static Material _rope;
     static Material _ghost;
 
-    public static Material Wood => _wood != null ? _wood : (_wood = Opaque(new Color(0.72f, 0.52f, 0.28f)));
-    public static Material WoodDark => _woodDark != null ? _woodDark : (_woodDark = Opaque(new Color(0.42f, 0.28f, 0.14f)));
-    public static Material Barrel => _barrel != null ? _barrel : (_barrel = Opaque(new Color(0.55f, 0.28f, 0.14f)));
-    public static Material Metal => _metal != null ? _metal : (_metal = Opaque(new Color(0.62f, 0.64f, 0.68f), 0.65f, 0.4f));
-    public static Material Rope => _rope != null ? _rope : (_rope = Opaque(new Color(0.7f, 0.58f, 0.32f)));
+    const string BarkDir = "Assets/TreeBarkMaterialPack/URP/Materials/";
+
+    public static Material Wood => _wood != null ? _wood : (_wood = Bark(1) ?? Opaque(new Color(0.72f, 0.52f, 0.28f)));
+    public static Material WoodDark => _woodDark != null ? _woodDark : (_woodDark = Bark(4) ?? Opaque(new Color(0.42f, 0.28f, 0.14f)));
+    public static Material Barrel => _barrel != null ? _barrel : (_barrel = Bark(3) ?? Opaque(new Color(0.55f, 0.28f, 0.14f)));
+    public static Material Metal => _metal != null ? _metal : (_metal = Bark(8) ?? Opaque(new Color(0.62f, 0.64f, 0.68f), 0.65f, 0.4f));
+    public static Material Rope => _rope != null ? _rope : (_rope = Bark(6) ?? Opaque(new Color(0.7f, 0.58f, 0.32f)));
+    static Material _logBark;
+    static Material _plankBark;
+    public static Material LogBark => _logBark != null ? _logBark : (_logBark = BarkForLength(WoodDark, true));
+    public static Material PlankBark => _plankBark != null ? _plankBark : (_plankBark = BarkForLength(Wood, false));
     static Material _ropeLine;
     public static Material RopeLine
     {
@@ -94,6 +100,28 @@ public static class BoatVisuals
         }
     }
 
+    public static float CurrentScale(BoatPieceKind kind)
+    {
+        switch (kind)
+        {
+            case BoatPieceKind.Barrel: return 1.45f;
+            case BoatPieceKind.Log: return 1.05f;
+            case BoatPieceKind.Oar: return 0.72f;
+            default: return 1.2f;
+        }
+    }
+
+    public static float CurrentCap(BoatPieceKind kind)
+    {
+        switch (kind)
+        {
+            case BoatPieceKind.Barrel: return 4.1f;
+            case BoatPieceKind.Log: return 3.1f;
+            case BoatPieceKind.Oar: return 2.2f;
+            default: return 3.5f;
+        }
+    }
+
     public static PrimitiveType Shape(BoatPieceKind kind)
     {
         switch (kind)
@@ -104,14 +132,96 @@ public static class BoatVisuals
         }
     }
 
+    public static void MapPlankLengthUv(MeshFilter filter, float uv0, float uv1)
+    {
+        if (filter == null)
+            return;
+        Mesh mesh = filter.sharedMesh;
+        if (mesh == null || mesh.name != "BoatPlankUv")
+        {
+            mesh = Object.Instantiate(CubeMesh());
+            mesh.name = "BoatPlankUv";
+            filter.sharedMesh = mesh;
+        }
+        Vector3[] verts = mesh.vertices;
+        Vector3[] norms = mesh.normals;
+        if (verts == null || verts.Length == 0)
+            return;
+        var uvs = new Vector2[verts.Length];
+        for (int i = 0; i < verts.Length; i++)
+        {
+            Vector3 v = verts[i];
+            Vector3 n = i < norms.Length ? norms[i] : Vector3.up;
+            float z01 = Mathf.Clamp01(v.z + 0.5f);
+            float along = Mathf.Lerp(uv0, uv1, z01);
+            float across = Mathf.Abs(n.x) > 0.5f
+                ? Mathf.Clamp01(v.y + 0.5f)
+                : Mathf.Clamp01(v.x + 0.5f);
+            uvs[i] = new Vector2(across, along);
+        }
+        mesh.uv = uvs;
+        mesh.RecalculateTangents();
+    }
+
+    public static void ApplySizeTiling(Renderer rend, BoatPieceKind kind, Vector3 size)
+    {
+        EnsureBarkSpan(kind, size, out float across, out float along, out _, out _);
+        ApplyBarkUv(rend, across, along, 0f, 1f);
+    }
+
+    public static void ApplyBarkUv(Renderer rend, float across, float alongFull, float uv0, float uv1)
+    {
+        if (rend == null)
+            return;
+        float span = Mathf.Max(0.02f, uv1 - uv0);
+        var tile = new Vector2(across, alongFull * span);
+        var off = new Vector2(0f, alongFull * uv0);
+        var block = new MaterialPropertyBlock();
+        rend.GetPropertyBlock(block);
+        SetBlockSt(block, "_BaseMap_ST", tile, off);
+        SetBlockSt(block, "_MainTex_ST", tile, off);
+        SetBlockSt(block, "_BumpMap_ST", tile, off);
+        SetBlockSt(block, "_MetallicGlossMap_ST", tile, off);
+        SetBlockSt(block, "_OcclusionMap_ST", tile, off);
+        SetBlockSt(block, "_ParallaxMap_ST", tile, off);
+        rend.SetPropertyBlock(block);
+    }
+
+    public static void BarkSpanForSize(BoatPieceKind kind, Vector3 size, out float across, out float along)
+    {
+        EnsureBarkSpan(kind, size, out across, out along, out _, out _);
+    }
+
+    static void EnsureBarkSpan(BoatPieceKind kind, Vector3 size, out float across, out float along, out float uv0, out float uv1)
+    {
+        uv0 = 0f;
+        uv1 = 1f;
+        Vector3 d = DefaultSize(kind);
+        int axis = LengthAxis(kind);
+        float along01 = d[axis] > 0.01f ? size[axis] / d[axis] : 1f;
+        along01 = Mathf.Clamp(along01, 0.08f, 4f);
+        across = 1.4f;
+        along = across * (2f / 0.7f) * along01;
+    }
+
+    static void SetBlockSt(MaterialPropertyBlock block, string st, Vector2 tile, Vector2 off)
+    {
+        block.SetVector(st, new Vector4(tile.x, tile.y, off.x, off.y));
+    }
+
+    static void SetBlockTiling(MaterialPropertyBlock block, string st, Vector2 tile)
+    {
+        SetBlockSt(block, st, tile, Vector2.zero);
+    }
+
     public static Material MaterialFor(BoatPieceKind kind)
     {
         switch (kind)
         {
-            case BoatPieceKind.Log: return WoodDark;
+            case BoatPieceKind.Log: return LogBark;
             case BoatPieceKind.Barrel: return Barrel;
             case BoatPieceKind.Oar: return WoodDark;
-            default: return Wood;
+            default: return PlankBark;
         }
     }
 
@@ -390,6 +500,42 @@ public static class BoatVisuals
         if (m.HasProperty("_ZWrite"))
             m.SetFloat("_ZWrite", 1f);
         m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Geometry;
+    }
+
+    static Material BarkForLength(Material src, bool log)
+    {
+        if (src == null)
+            return null;
+        var m = new Material(src);
+        m.name = src.name + (log ? "_Log" : "_Plank");
+        const float lengthOverWidth = 2f / 0.7f;
+        float across = 1.4f;
+        float along = across * lengthOverWidth;
+        Vector2 tile = new Vector2(across, along);
+        SetMapTiling(m, "_BaseMap", tile);
+        SetMapTiling(m, "_MainTex", tile);
+        SetMapTiling(m, "_BumpMap", tile);
+        SetMapTiling(m, "_MetallicGlossMap", tile);
+        SetMapTiling(m, "_OcclusionMap", tile);
+        SetMapTiling(m, "_ParallaxMap", tile);
+        return m;
+    }
+
+    static void SetMapTiling(Material m, string tex, Vector2 tile)
+    {
+        if (m.HasProperty(tex))
+            m.SetTextureScale(tex, tile);
+    }
+
+    static Material Bark(int index)
+    {
+        string path = BarkDir + "M_TreeBark_" + index.ToString("00") + ".mat";
+#if UNITY_EDITOR
+        var fromPack = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (fromPack != null)
+            return fromPack;
+#endif
+        return Resources.Load<Material>("TreeBark/M_TreeBark_" + index.ToString("00"));
     }
 
     static Material Opaque(Color c, float metallic = 0f, float smoothness = 0.22f)

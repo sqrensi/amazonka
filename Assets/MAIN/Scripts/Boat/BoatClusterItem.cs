@@ -6,6 +6,8 @@ using UnityEngine;
 /// </summary>
 public class BoatClusterItem : HeldItem
 {
+    public override float WaterLift() => 48f;
+    public override float WaterCurrent() => 1.1f;
     GameObject _ghost;
     Vector3 _ghostPos;
     Vector3 _ghostPosVel;

@@ -6,6 +6,7 @@ using UnityEngine;
 /// </summary>
 public class FlashlightItem : HeldItem
 {
+    protected override bool SinksInWater => true;
     [Header("Flashlight")]
     [SerializeField] Light spot;
     [SerializeField] bool startsOn = true;
@@ -77,5 +78,19 @@ public class FlashlightItem : HeldItem
             intensity += (Mathf.PerlinNoise(Time.time * 9.1f, 0.37f) - 0.5f) * 2f * flickerAmount;
         float close = inHand ? RetractAmount : 0f;
         spot.intensity = intensity * Mathf.Lerp(1f, 0.62f, close);
+        if (inHand && lit)
+        {
+            Vector3 origin = spot.transform.position;
+            Vector3 dir = spot.transform.forward;
+            var owner = GetComponentInParent<HorrorFirstPersonController>();
+            if (owner == null && Inventory != null)
+                owner = Inventory.GetComponent<HorrorFirstPersonController>();
+            if (owner != null && owner.PlayerCam != null)
+            {
+                origin = owner.PlayerCam.transform.position;
+                dir = owner.PlayerCam.transform.forward;
+            }
+            RiverShark.TryFlash(origin, dir, 14f, 34f);
+        }
     }
 }

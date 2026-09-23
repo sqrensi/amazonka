@@ -22,6 +22,8 @@ public class WorldItemPickup : MonoBehaviour, IInteractable
         _selfItem = GetComponent<HeldItem>();
         if (_selfItem != null)
             enabled = false;
+        else
+            BoatLayers.BindPickup(this, true);
     }
 
     public string GetPrompt() => _selfItem != null ? _selfItem.GetPrompt() : $"Pickup {ItemName}";

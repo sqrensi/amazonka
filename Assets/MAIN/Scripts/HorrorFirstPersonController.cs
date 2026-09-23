@@ -7,6 +7,7 @@ public class HorrorFirstPersonController : MonoBehaviour
 {
     [SerializeField] Transform cameraPivot;
     [SerializeField] Camera playerCamera;
+    public Camera PlayerCam => playerCamera;
 
     [Header("Movement")]
     [SerializeField] float walkSpeed = 2f;
@@ -111,9 +112,8 @@ public class HorrorFirstPersonController : MonoBehaviour
     Vector3 _rideLocal;
     BoatPiece _rideHull;
     bool _rideIgnore;
-    Vector3 _rideBoatPos;
-    Quaternion _rideBoatRot;
-    bool _ridePoseReady;
+    float _rideIgnoreUntil;
+    float _offRaftUntil;
     bool _wasAtSwimSurface;
     Vector3 _swimVel;
     int _lastFootstepIndex = -1;
@@ -158,6 +158,7 @@ public class HorrorFirstPersonController : MonoBehaviour
     /// <summary>Скорость ввода движения (для гребли на лодке).</summary>
     public Vector2 MoveInput => _moveInput;
     public bool IsSwimming { get; private set; }
+    public bool IsOnCraft => _rideBoat != null && !IsSwimming;
     /// <summary>Игрок сидит на лодке — обычный мотор капсулы выключен.</summary>
     public bool MovementLocked { get; set; }
 
@@ -189,6 +190,8 @@ public class HorrorFirstPersonController : MonoBehaviour
 
         if (playerCamera != null && playerCamera.GetComponent<UnderwaterFx>() == null)
             playerCamera.gameObject.AddComponent<UnderwaterFx>();
+        if (playerCamera != null && playerCamera.GetComponent<AtmosphereFog>() == null)
+            playerCamera.gameObject.AddComponent<AtmosphereFog>();
 
         if (footstepSource == null)
             footstepSource = GetComponent<AudioSource>();
@@ -230,47 +233,14 @@ public class HorrorFirstPersonController : MonoBehaviour
 
     void FixedUpdate()
     {
-        ApplyDeckWeight();
     }
 
     void ApplyDeckWeight()
     {
-        if (!TryBoatDeck(out _, out BoatPiece hull) || hull == null)
-            return;
-        Rigidbody rb = hull.IslandRootBody();
-        if (rb == null)
-            rb = hull.Body;
-        if (rb == null)
-            return;
-        Vector3 feet = transform.position + Vector3.up * 0.06f;
-        Vector3 at = Vector3.Lerp(rb.worldCenterOfMass, feet, 0.14f);
-        float weight = hull.HullIsCraft ? 150f : 95f;
-        rb.AddForceAtPosition(Vector3.down * weight, at, ForceMode.Force);
-        if (MovementLocked || _moveInput.sqrMagnitude < 0.04f)
-            return;
-        Vector3 walk = transform.right * _moveInput.x + transform.forward * _moveInput.y;
-        walk.y = 0f;
-        if (walk.sqrMagnitude < 0.01f)
-            return;
-        walk.Normalize();
-        float k = IsSprinting ? 1.1f : (IsCrouching ? 0.4f : 0.7f);
-        rb.AddForce(-walk * (55f * k) + Vector3.down * (22f * k), ForceMode.Force);
     }
 
     void PunchDeck(float downImpulse)
     {
-        if (downImpulse < 0.5f)
-            return;
-        if (!TryBoatDeck(out _, out BoatPiece hull) || hull == null)
-            return;
-        Rigidbody rb = hull.IslandRootBody();
-        if (rb == null)
-            rb = hull.Body;
-        if (rb == null)
-            return;
-        Vector3 feet = transform.position + Vector3.up * 0.05f;
-        Vector3 at = Vector3.Lerp(rb.worldCenterOfMass, feet, 0.16f);
-        rb.AddForceAtPosition(Vector3.down * downImpulse, at, ForceMode.Impulse);
     }
 
     public void OnMove(InputValue value) => _moveInput = value.Get<Vector2>();
@@ -370,27 +340,38 @@ public class HorrorFirstPersonController : MonoBehaviour
 
     void UpdateMotor(float dt)
     {
+        if (_rideIgnore && _rideBoat == null && Time.time >= _rideIgnoreUntil)
+        {
+            if (_rideHull != null && _controller != null)
+                BoatBuildUtil.SetActorIgnoreIsland(_controller, _rideHull, false);
+            _rideIgnore = false;
+            _rideHull = null;
+        }
         if (MovementLocked)
         {
             _jumpQueued = false;
-            if (_rideBoat == null)
-                CaptureBoatFollow();
+            IsSwimming = false;
+            _heaving = false;
+            if (_rideBoat != null)
+                ApplyBoatFollow();
             return;
         }
 
         bool onDeck = TryBoatDeck(out float deckY, out _);
-        if (onDeck && transform.position.y < deckY - 0.03f)
-        {
-            _controller.Move(Vector3.up * (deckY - transform.position.y));
-            _verticalVelocity = Mathf.Min(_verticalVelocity, 0f);
-        }
-
-        bool grounded = IsOnWalkableGround() || onDeck;
         bool overWater = BoatWater.TryHeight(transform.position, out float waterY);
+        if (onDeck && overWater && deckY < waterY - 0.16f)
+            onDeck = false;
+        if (!onDeck && _rideBoat != null && overWater && transform.position.y < waterY - 0.08f)
+        {
+            LeaveRaft();
+            _swimVel.y = Mathf.Max(_swimVel.y, 2.6f);
+            _verticalVelocity = Mathf.Max(_verticalVelocity, 2.6f);
+        }
+        bool grounded = IsOnWalkableGround() || onDeck;
         float feetY = transform.position.y;
         float camLocalY = cameraPivot != null ? cameraPivot.localPosition.y : standingCameraHeight;
         float floatFeet = waterY - camLocalY + 0.32f;
-        bool inWater = overWater && waterY > feetY + 0.06f;
+        bool inWater = !onDeck && overWater && waterY > feetY + 0.06f;
         bool wasSwimming = IsSwimming;
         bool swimming = !onDeck && overWater && !grounded &&
             (feetY < waterY - 0.06f || _heaving || (wasSwimming && feetY < waterY + 0.9f && !_jumpedThisAir));
@@ -401,7 +382,7 @@ public class HorrorFirstPersonController : MonoBehaviour
             planar.Normalize();
         bool nearLedge = swimming && TryFindWaterExit(planar.sqrMagnitude > 0.04f ? planar : transform.forward, waterY, out ledgeY);
         _controller.stepOffset = onDeck
-            ? Mathf.Max(_defaultStepOffset, 0.38f)
+            ? _defaultStepOffset
             : !swimming || _heaving || nearLedge
                 ? Mathf.Max(_defaultStepOffset, (_heaving || nearLedge) ? 0.62f : _defaultStepOffset)
                 : 0f;
@@ -465,6 +446,10 @@ public class HorrorFirstPersonController : MonoBehaviour
         _currentSpeed = Mathf.Lerp(_currentSpeed, targetSpeed, 1f - Mathf.Exp(-acceleration * dt));
         Vector3 velocity = planar * _currentSpeed;
 
+        bool wantJump = _jumpQueued && !IsCrouching;
+        if (!swimming && RideDeck(dt, planar, wantJump))
+            return;
+
         if (swimming)
         {
             _jumpedThisAir = false;
@@ -482,7 +467,7 @@ public class HorrorFirstPersonController : MonoBehaviour
         if (grounded && _verticalVelocity < 0f)
             _verticalVelocity = -2f;
 
-        if (_jumpQueued && _coyoteTime > 0f && !IsCrouching)
+        if (_jumpQueued && !IsCrouching && _coyoteTime > 0f)
         {
             _verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
             _jumpQueued = false;
@@ -523,12 +508,18 @@ public class HorrorFirstPersonController : MonoBehaviour
         Vector3 worldVel = _controller.velocity;
         LocalPlanarVelocity = transform.InverseTransformDirection(new Vector3(worldVel.x, 0f, worldVel.z));
         _wasGrounded = grounded;
-        CaptureBoatFollow();
+        if (_rideBoat == null && !_jumpedThisAir)
+            SeparateFromBoatPieces(false);
+        if (!_jumpedThisAir)
+            CaptureBoatFollow();
     }
 
     void UpdateSwim(float dt, float waterY, float floatFeet, bool nearLedge, Vector3 planar)
     {
-        if (TryBoatDeck(out float deckY, out _))
+        if (Time.time >= _offRaftUntil && TryBoatDeck(out float deckY, out BoatPiece deck)
+            && transform.position.y > deckY - 0.18f
+            && (deck == null || deck.CanRide())
+            && !(BoatWater.TryHeight(transform.position, out float wy) && deckY < wy - 0.16f))
         {
             if (transform.position.y < deckY - 0.03f)
                 _controller.Move(Vector3.up * (deckY - transform.position.y));
@@ -540,7 +531,8 @@ public class HorrorFirstPersonController : MonoBehaviour
             CaptureBoatFollow();
             return;
         }
-        ClearBoatFollow();
+        if (_rideBoat != null)
+            LeaveRaft();
         Transform look = playerCamera != null ? playerCamera.transform : (cameraPivot != null ? cameraPivot : transform);
         Vector3 right = look.right;
         right.y = 0f;
@@ -571,7 +563,7 @@ public class HorrorFirstPersonController : MonoBehaviour
             _swimVel.x = air.x;
             _swimVel.z = air.z;
             _swimVel.y = _verticalVelocity;
-            _controller.Move(_swimVel * dt);
+            _controller.Move((_swimVel + SwimCurrent()) * dt);
             SeparateFromBoatPieces(true);
             if (IsOnWalkableGround() || TryBoatDeck(out _, out _))
             {
@@ -592,7 +584,7 @@ public class HorrorFirstPersonController : MonoBehaviour
         }
 
         if (_swimVel.y < -1.15f)
-            _swimVel.y = Mathf.Lerp(_swimVel.y, -0.85f, 1f - Mathf.Exp(-5.5f * dt));
+            _swimVel.y = Mathf.Lerp(_swimVel.y, -0.35f, 1f - Mathf.Exp(-6.5f * dt));
 
         if (space && !atSurface)
             wish += Vector3.up * 1.15f;
@@ -606,11 +598,14 @@ public class HorrorFirstPersonController : MonoBehaviour
             : 0f;
         Vector3 target = wish * speed;
 
-        float buoy = Mathf.Clamp((floatFeet - transform.position.y) * 1.55f, -1.15f, 1.2f);
+        float depth = floatFeet - transform.position.y;
+        float buoy = Mathf.Clamp(depth * 2.6f, -1.15f, 4.4f);
         if (wish.y < -0.15f)
-            buoy *= 0.2f;
+            buoy *= 0.18f;
         else if (wish.sqrMagnitude > 0.08f)
-            buoy *= 0.45f;
+            buoy *= 0.55f;
+        if (depth > 0.6f && wish.y >= -0.05f)
+            buoy = Mathf.Max(buoy, 2.2f);
         target.y += buoy;
 
         float accel = 4.2f;
@@ -621,7 +616,8 @@ public class HorrorFirstPersonController : MonoBehaviour
             _swimVel.y = Mathf.Min(_swimVel.y, (floatFeet - transform.position.y) * 4.5f);
 
         _verticalVelocity = _swimVel.y;
-        _controller.Move(_swimVel * dt);
+        Vector3 swimMove = _swimVel + SwimCurrent();
+        _controller.Move(swimMove * dt);
         SeparateFromBoatPieces(nearLedge);
         if (transform.position.y > floatFeet + 0.18f)
         {
@@ -634,6 +630,15 @@ public class HorrorFirstPersonController : MonoBehaviour
         _wasGrounded = false;
         _wasAtSwimSurface = atSurface && !_heaving;
         FinishSwimMove(planar);
+    }
+
+    Vector3 SwimCurrent()
+    {
+        if (_rideBoat != null || MovementLocked)
+            return Vector3.zero;
+        Vector3 cur = BoatWater.CurrentAt(transform.position);
+        cur.y = 0f;
+        return cur * 0.28f;
     }
 
     void FinishSwimMove(Vector3 planar)
@@ -670,8 +675,8 @@ public class HorrorFirstPersonController : MonoBehaviour
                 continue;
             if (hit.collider == null || hit.collider.GetComponentInParent<BoatWater>() != null)
                 continue;
-            bool boat = hit.collider.GetComponentInParent<BoatPiece>() != null;
-            if (hit.normal.y < minNy && !boat)
+            bool boat = BoatPart.FromCollider(hit.collider) != null;
+            if (boat)
                 continue;
             if (!boat && hit.point.y <= waterY + 0.08f)
                 continue;
@@ -704,7 +709,7 @@ public class HorrorFirstPersonController : MonoBehaviour
         for (int i = 0; i < n; i++)
         {
             var col = _groundOverlap[i];
-            if (col == null || col.GetComponentInParent<BoatPiece>() == null)
+            if (col == null || BoatPart.FromCollider(col) == null)
                 continue;
             if (col.GetComponentInParent<BoatIgnoreActors>() != null)
                 continue;
@@ -777,9 +782,11 @@ public class HorrorFirstPersonController : MonoBehaviour
             var col = _groundOverlap[i];
             if (col == null || col.transform == transform || col.transform.IsChildOf(transform))
                 continue;
-            Vector3 p = col.ClosestPoint(feet);
+            Vector3 p = BoatBuildUtil.ClosestPoint(col, feet);
             Vector3 away = feet - p;
-            bool flat = away.sqrMagnitude < 0.0001f || away.normalized.y >= minY;
+            if (away.sqrMagnitude < 0.0001f)
+                continue;
+            bool flat = away.normalized.y >= minY;
             if (IsStandSurface(col, p, flat))
                 return true;
         }
@@ -787,48 +794,271 @@ public class HorrorFirstPersonController : MonoBehaviour
         return false;
     }
 
+    public bool RidesIsland(BoatPiece piece)
+    {
+        if (piece == null)
+            return false;
+        if (_rideBoat != null)
+        {
+            if (_rideHull != null && piece.SharesIslandWith(_rideHull))
+                return true;
+            if (piece.IslandRootBody() == _rideBoat)
+                return true;
+        }
+        if (IsSwimming)
+            return false;
+        return TryBoatDeck(out _, out BoatPiece hull) && hull != null && hull.SharesIslandWith(piece);
+    }
+
     public void BindBoatFollow()
     {
+        _offRaftUntil = 0f;
         CaptureBoatFollow();
     }
 
-    const float DeckReach = 0.46f;
+    public void BindBoatFollow(BoatPiece hull)
+    {
+        _offRaftUntil = 0f;
+        if (hull == null)
+        {
+            ClearBoatFollow();
+            return;
+        }
+        Rigidbody boat = hull.IslandRootBody();
+        ClearBoatFollow();
+        _rideHull = hull;
+        _rideBoat = boat;
+        if (boat == null || _controller == null)
+            return;
+        _rideLocal = boat.transform.InverseTransformPoint(transform.position);
+        BoatBuildUtil.SetActorIgnoreIsland(_controller, hull, true);
+        _rideIgnore = true;
+    }
+
+    public void ReleaseBoatFollow()
+    {
+        ClearBoatFollow();
+    }
+
+    const float DeckReach = 0.17f;
+    readonly RaycastHit[] _deckHits = new RaycastHit[16];
+
+    bool RideDeck(float dt, Vector3 planar, bool wantJump)
+    {
+        if (MovementLocked)
+            return false;
+        if (Time.time < _offRaftUntil && _rideBoat == null)
+            return false;
+        if (_rideHull != null && !_rideHull.CanRide())
+        {
+            ClearBoatFollow();
+            return false;
+        }
+        if (!TryBoatDeck(out _, out _) && _rideBoat == null)
+            return false;
+        if (!(_jumpedThisAir && _rideBoat != null))
+            CaptureBoatFollow();
+        if (_rideBoat == null)
+            return false;
+
+        Vector3 worldStep = planar * _currentSpeed * dt;
+        Vector3 localStep = _rideBoat.transform.InverseTransformDirection(worldStep);
+        localStep.y = 0f;
+
+        if (wantJump && !_jumpedThisAir)
+        {
+            _jumpedThisAir = true;
+            _verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
+            _jumpQueued = false;
+            PlayJumpSound();
+            _coyoteTime = 0f;
+            _stepTimer = 0f;
+        }
+
+        if (_jumpedThisAir)
+        {
+            _verticalVelocity += gravity * dt;
+            _rideLocal += localStep;
+            Vector3 next = _rideBoat.transform.TransformPoint(_rideLocal);
+            float y = transform.position.y + _verticalVelocity * dt;
+            next.y = y;
+            bool falling = _verticalVelocity <= 0f;
+            if (falling && TryBoatDeckAt(next, out float deckY, out BoatPiece hull, true, true) && hull != null
+                && y <= deckY + 0.1f)
+            {
+                StickDeckWalk(new Vector3(next.x, deckY, next.z), deckY, hull, dt, planar, worldStep);
+                _jumpedThisAir = false;
+                return true;
+            }
+            if (falling && !TryBoatDeckAt(next, out _, out BoatPiece stillOn, true, true))
+            {
+                transform.position = next;
+                LeaveRaft();
+                return false;
+            }
+            transform.position = next;
+            _heaving = false;
+            IsSwimming = false;
+            LocalPlanarVelocity = transform.InverseTransformDirection(new Vector3(worldStep.x, 0f, worldStep.z) / Mathf.Max(dt, 0.0001f));
+            return true;
+        }
+
+        Vector3 nextWorld = _rideBoat.transform.TransformPoint(_rideLocal + localStep);
+
+        if (TryBoatDeckAt(nextWorld, out float landY, out BoatPiece landHull) && landHull != null)
+        {
+            StickDeckWalk(nextWorld, landY, landHull, dt, planar, worldStep);
+            return true;
+        }
+
+        if (planar.sqrMagnitude < 0.04f && _rideBoat != null)
+        {
+            Vector3 stay = _rideBoat.transform.TransformPoint(_rideLocal);
+            if (TryBoatDeckAt(stay, out landY, out landHull, true, true) && landHull != null)
+            {
+                StickDeckWalk(stay, landY, landHull, dt, planar, worldStep);
+                return true;
+            }
+            transform.position = stay;
+            _verticalVelocity = 0f;
+            IsSwimming = false;
+            return true;
+        }
+
+        LeaveRaft();
+        if (worldStep.sqrMagnitude > 0.0000001f)
+            _controller.Move(worldStep);
+        return false;
+    }
+
+    void StickDeckWalk(Vector3 nextWorld, float landY, BoatPiece landHull, float dt, Vector3 planar, Vector3 worldStep)
+    {
+        nextWorld.y = landY;
+        _rideLocal = _rideBoat.transform.InverseTransformPoint(nextWorld);
+        _rideHull = landHull;
+        transform.position = _rideBoat.transform.TransformPoint(_rideLocal);
+        _verticalVelocity = 0f;
+        _heaving = false;
+        _swimVel = Vector3.zero;
+        IsSwimming = false;
+        _wasGrounded = true;
+        _airborneTime = 0f;
+        _coyoteTime = 0.14f;
+        UpdateFootsteps(dt, true, planar.magnitude);
+        LocalPlanarVelocity = transform.InverseTransformDirection(new Vector3(worldStep.x, 0f, worldStep.z) / Mathf.Max(dt, 0.0001f));
+    }
+
+    static bool IsOarCollider(Collider col)
+    {
+        if (col == null)
+            return false;
+        Transform t = col.transform;
+        while (t != null)
+        {
+            string n = t.name;
+            if (n.IndexOf("Oar", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || n.IndexOf("Shaft", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || n.IndexOf("Blade", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || n.IndexOf("Oarlock", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+            if (t.GetComponent<BoatPiece>() != null)
+                break;
+            t = t.parent;
+        }
+        return false;
+    }
 
     bool TryBoatDeck(out float supportY, out BoatPiece hull)
+    {
+        return TryBoatDeckAt(transform.position, out supportY, out hull);
+    }
+
+    public void SnapOntoHull(BoatPiece lead)
+    {
+        if (lead == null || _controller == null)
+            return;
+        IsSwimming = false;
+        _heaving = false;
+        _jumpedThisAir = false;
+        Vector3 pos;
+        BoatPiece hull;
+        if (!BoatPiece.BestDeckStand(lead, out pos, out hull))
+        {
+            var body = lead.IslandRootBody();
+            Vector3 com = body != null ? body.worldCenterOfMass : lead.transform.position;
+            pos = new Vector3(com.x, com.y + 0.35f, com.z);
+            hull = lead;
+        }
+        _controller.enabled = false;
+        transform.position = pos;
+        Physics.SyncTransforms();
+        if (TryBoatDeckAt(pos, out float y, out BoatPiece deck, true, true) && deck != null)
+        {
+            pos.y = y + 0.12f;
+            hull = deck;
+            transform.position = pos;
+        }
+        else
+        {
+            pos.y += 0.1f;
+            transform.position = pos;
+        }
+        _controller.enabled = true;
+        BindBoatFollow(hull != null ? hull : lead);
+        if (_rideBoat != null)
+            _rideLocal = _rideBoat.transform.InverseTransformPoint(transform.position);
+    }
+
+    public void ClearSwimState()
+    {
+        IsSwimming = false;
+        _heaving = false;
+        _jumpedThisAir = false;
+    }
+
+    bool TryBoatDeckAt(Vector3 feet, out float supportY, out BoatPiece hull, bool ignoreVert = false, bool anyHull = false)
     {
         supportY = float.NegativeInfinity;
         hull = null;
         if (_controller == null)
             return false;
-
-        Vector3 feet = transform.position;
-        Vector3 probe = feet + Vector3.up * 0.2f;
-        int n = Physics.OverlapSphereNonAlloc(probe, DeckReach, _groundOverlap, ~0, QueryTriggerInteraction.Ignore);
+        float lift = ignoreVert ? 1.15f : 0.5f;
+        float dist = ignoreVert ? 2.3f : 0.95f;
+        int n = Physics.SphereCastNonAlloc(
+            feet + Vector3.up * lift,
+            DeckReach,
+            Vector3.down,
+            _deckHits,
+            dist,
+            ~0,
+            QueryTriggerInteraction.Ignore);
         for (int i = 0; i < n; i++)
         {
-            var col = _groundOverlap[i];
+            var hit = _deckHits[i];
+            var col = hit.collider;
             if (col == null || col.isTrigger)
                 continue;
             if (col.transform == transform || col.transform.IsChildOf(transform))
                 continue;
             if (col.GetComponentInParent<BoatWater>() != null)
                 continue;
-            var piece = col.GetComponentInParent<BoatPiece>();
+            if (col.GetComponentInParent<RiverShark>() != null)
+                continue;
+            var piece = BoatPart.FromCollider(col);
             if (piece == null || piece.Kind == BoatPieceKind.Oar)
                 continue;
-
-            Vector3 closest = col.ClosestPoint(feet + Vector3.up * 0.06f);
-            Vector3 horiz = closest - feet;
-            horiz.y = 0f;
-            if (horiz.sqrMagnitude > DeckReach * DeckReach)
+            bool sameRide = _rideHull != null && piece.SharesIslandWith(_rideHull);
+            if (!anyHull && !sameRide && !piece.CanRide())
                 continue;
-
-            Vector3 origin = new Vector3(feet.x, Mathf.Max(feet.y + 0.9f, col.bounds.max.y + 0.35f), feet.z);
-            if (!col.Raycast(new Ray(origin, Vector3.down), out RaycastHit hit, 2.4f))
+            if (IsOarCollider(col))
                 continue;
-            if (hit.normal.y < 0.35f)
+            if (hit.normal.y < 0.45f)
                 continue;
-            if (hit.point.y < feet.y - 0.55f || hit.point.y > feet.y + 0.75f)
+            Vector3 planar = hit.point - feet;
+            planar.y = 0f;
+            if (planar.sqrMagnitude > 0.2f * 0.2f)
+                continue;
+            if (!ignoreVert && (hit.point.y < feet.y - 0.55f || hit.point.y > feet.y + 0.7f))
                 continue;
             if (hit.point.y > supportY)
             {
@@ -839,16 +1069,25 @@ public class HorrorFirstPersonController : MonoBehaviour
         return hull != null;
     }
 
-    BoatPiece StandingOnBoat()
+    public BoatPiece HullUnderFeet()
     {
         return TryBoatDeck(out _, out BoatPiece hull) ? hull : null;
     }
 
+    BoatPiece StandingOnBoat()
+    {
+        return HullUnderFeet();
+    }
+
     void CaptureBoatFollow()
     {
+        if (!MovementLocked && Time.time < _offRaftUntil)
+            return;
         var hull = StandingOnBoat();
         if (hull == null && BoatOarStation.Active != null)
             hull = BoatOarStation.Active.Oar;
+        if (hull == null && _rideBoat != null)
+            return;
         Rigidbody boat = hull != null ? hull.IslandRootBody() : null;
 
         if (boat != null && _rideBoat != null && boat != _rideBoat && hull != null
@@ -859,9 +1098,11 @@ public class HorrorFirstPersonController : MonoBehaviour
         {
             if (_rideBoat == null)
                 return;
-            if (MovementLocked)
-                return;
-            _rideLocal = _rideBoat.transform.InverseTransformPoint(transform.position);
+            if (!_rideIgnore && hull != null)
+            {
+                BoatBuildUtil.SetActorIgnoreIsland(_controller, hull, true);
+                _rideIgnore = true;
+            }
             if (hull != null)
                 _rideHull = hull;
             return;
@@ -870,49 +1111,67 @@ public class HorrorFirstPersonController : MonoBehaviour
         ClearBoatFollow();
         _rideBoat = boat;
         _rideHull = hull;
-        _ridePoseReady = false;
         if (boat == null || hull == null || _controller == null)
             return;
         _rideLocal = boat.transform.InverseTransformPoint(transform.position);
-        if (MovementLocked)
-        {
-            BoatBuildUtil.SetActorIgnoreIsland(_controller, hull, true);
-            _rideIgnore = true;
-        }
+        BoatBuildUtil.SetActorIgnoreIsland(_controller, hull, true);
+        _rideIgnore = true;
     }
 
     void ApplyBoatFollow()
     {
         if (_rideBoat == null)
             return;
-        if (MovementLocked)
+        Vector3 p = _rideBoat.transform.TransformPoint(_rideLocal);
+        if (BoatOarStation.Active != null && !_jumpedThisAir)
         {
-            transform.position = _rideBoat.transform.TransformPoint(_rideLocal);
-            return;
+            if (TryBoatDeckAt(p, out float y, out BoatPiece hull, true, true) && hull != null)
+            {
+                p.y = y;
+                _rideHull = hull;
+                _rideLocal = _rideBoat.transform.InverseTransformPoint(p);
+            }
+            else
+            {
+                Vector3 com = _rideBoat.worldCenterOfMass;
+                Vector3 pull = Vector3.Lerp(p, new Vector3(com.x, p.y, com.z), 0.55f);
+                if (TryBoatDeckAt(pull, out y, out hull, true, true) && hull != null)
+                {
+                    pull.y = y;
+                    p = pull;
+                    _rideHull = hull;
+                    _rideLocal = _rideBoat.transform.InverseTransformPoint(p);
+                }
+            }
         }
-
-        if (!_ridePoseReady)
-        {
-            _rideBoatPos = _rideBoat.position;
-            _rideBoatRot = _rideBoat.rotation;
-            _ridePoseReady = true;
-            return;
-        }
-
-        Vector3 local = Quaternion.Inverse(_rideBoatRot) * (transform.position - _rideBoatPos);
-        transform.position = _rideBoat.position + _rideBoat.rotation * local;
-        _rideBoatPos = _rideBoat.position;
-        _rideBoatRot = _rideBoat.rotation;
+        else if (_jumpedThisAir)
+            p.y = transform.position.y;
+        transform.position = p;
     }
 
-    void ClearBoatFollow()
+    void LeaveRaft()
     {
-        if (_rideIgnore && _rideHull != null && _controller != null)
-            BoatBuildUtil.SetActorIgnoreIsland(_controller, _rideHull, false);
-        _rideIgnore = false;
+        ClearBoatFollow(true);
+        _offRaftUntil = Time.time + 0.95f;
+        _jumpedThisAir = true;
+    }
+
+    void ClearBoatFollow(bool keepIgnore = false)
+    {
+        if (!keepIgnore)
+        {
+            if (_rideIgnore && _rideHull != null && _controller != null)
+                BoatBuildUtil.SetActorIgnoreIsland(_controller, _rideHull, false);
+            _rideIgnore = false;
+            _rideHull = null;
+            _rideIgnoreUntil = 0f;
+        }
+        else
+        {
+            _rideIgnoreUntil = Time.time + 0.32f;
+            _rideIgnore = true;
+        }
         _rideBoat = null;
-        _rideHull = null;
-        _ridePoseReady = false;
     }
 
     bool IsStandSurface(Collider col, Vector3 point, bool flatEnough)
@@ -921,7 +1180,7 @@ public class HorrorFirstPersonController : MonoBehaviour
             return false;
         if (col.GetComponentInParent<BoatWater>() != null)
             return false;
-        bool boat = col.GetComponentInParent<BoatPiece>() != null;
+        bool boat = BoatPart.FromCollider(col) != null;
         if (boat)
             return flatEnough;
         if (!flatEnough)
@@ -1218,7 +1477,7 @@ public class HorrorFirstPersonController : MonoBehaviour
             return;
 
         var item = hit.collider.GetComponentInParent<HeldItem>();
-        var piece = hit.collider.GetComponentInParent<BoatPiece>();
+        var piece = BoatPart.FromCollider(hit.collider);
         if (piece != null && hit.moveDirection.y < -0.18f)
             return;
         if (item != null && !item.IsCarried && hit.moveDirection.y < -0.18f)

@@ -150,6 +150,8 @@ public class PlayerInventory : MonoBehaviour
     {
         if (BoatOarStation.Active != null)
             return;
+        if (BoatRaceMode.Current != null && BoatRaceMode.Current.HandsLocked)
+            return;
         if (index < 0 || index >= SlotCount)
             return;
 

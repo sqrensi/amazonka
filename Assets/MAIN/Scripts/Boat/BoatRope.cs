@@ -48,14 +48,24 @@ public class BoatRope : MonoBehaviour
             }
             if (!r.Owns(t))
                 continue;
-            add(r.PieceOf(r.BodyA));
-            add(r.PieceOf(r.BodyB));
+            add(PieceFromAnchor(r.AnchorA));
+            add(PieceFromAnchor(r.AnchorB));
         }
+    }
+
+    static BoatPiece PieceFromAnchor(Transform a)
+    {
+        return a != null ? a.GetComponentInParent<BoatPiece>() : null;
     }
 
     BoatPiece PieceOf(Rigidbody body)
     {
-        return body != null ? body.GetComponent<BoatPiece>() : null;
+        if (body == null)
+            return null;
+        var p = body.GetComponent<BoatPiece>();
+        if (p != null)
+            return p;
+        return body.GetComponentInChildren<BoatPiece>();
     }
 
     public bool Owns(Transform t)
@@ -71,8 +81,12 @@ public class BoatRope : MonoBehaviour
 
     public void Bind(BoatPiece a, Vector3 worldA, BoatPiece b, Vector3 worldB)
     {
-        BodyA = a.Body;
-        BodyB = b.Body;
+        if (a != null && a.Body == null)
+            a.MakeFreeBody();
+        if (b != null && b.Body == null)
+            b.MakeFreeBody();
+        BodyA = a != null ? a.IslandRootBody() : null;
+        BodyB = b != null ? b.IslandRootBody() : null;
         AnchorA = CreateAnchor(a.transform, worldA, "RopeA");
         AnchorB = CreateAnchor(b.transform, worldB, "RopeB");
         BuildJoint();
@@ -127,9 +141,9 @@ public class BoatRope : MonoBehaviour
             if (r == null || !r.Owns(t))
                 continue;
             Vector3 p = Vector3.zero;
-            if (r.BodyA == piece.Body && r.AnchorA != null)
+            if (PieceFromAnchor(r.AnchorA) == piece && r.AnchorA != null)
                 p = r.AnchorA.position;
-            else if (r.BodyB == piece.Body && r.AnchorB != null)
+            else if (PieceFromAnchor(r.AnchorB) == piece && r.AnchorB != null)
                 p = r.AnchorB.position;
             else
                 continue;
@@ -192,9 +206,9 @@ public class BoatRope : MonoBehaviour
             var p = parts[i];
             if (p == null)
                 continue;
-            if (r.BodyA == p.Body)
+            if (PieceFromAnchor(r.AnchorA) == p)
                 a = true;
-            if (r.BodyB == p.Body)
+            if (PieceFromAnchor(r.AnchorB) == p)
                 b = true;
         }
         return a && b;
@@ -211,25 +225,25 @@ public class BoatRope : MonoBehaviour
             if (r == null)
                 continue;
             bool changed = false;
-            if (r.BodyA == from.Body && r.AnchorA != null)
+            if (PieceFromAnchor(r.AnchorA) == from && r.AnchorA != null)
             {
                 float a = t.InverseTransformPoint(r.AnchorA.position)[axis];
                 bool onKeep = keepLeft ? a < cut : a > cut;
                 if (!onKeep)
                 {
-                    r.BodyA = offcut.Body;
                     r.AnchorA.SetParent(offcut.transform, true);
+                    r.BodyA = offcut.IslandRootBody() != null ? offcut.IslandRootBody() : offcut.Body;
                     changed = true;
                 }
             }
-            if (r.BodyB == from.Body && r.AnchorB != null)
+            if (PieceFromAnchor(r.AnchorB) == from && r.AnchorB != null)
             {
                 float b = t.InverseTransformPoint(r.AnchorB.position)[axis];
                 bool onKeep = keepLeft ? b < cut : b > cut;
                 if (!onKeep)
                 {
-                    r.BodyB = offcut.Body;
                     r.AnchorB.SetParent(offcut.transform, true);
+                    r.BodyB = offcut.IslandRootBody() != null ? offcut.IslandRootBody() : offcut.Body;
                     changed = true;
                 }
             }
@@ -238,11 +252,72 @@ public class BoatRope : MonoBehaviour
         }
     }
 
-    void RebuildJoint()
+    public static void RetargetToRoots(System.Collections.Generic.IList<BoatPiece> parts)
+    {
+        if (parts == null)
+            return;
+        for (int i = 0; i < All.Count; i++)
+        {
+            var r = All[i];
+            if (r == null)
+                continue;
+            var pa = PieceFromAnchor(r.AnchorA);
+            var pb = PieceFromAnchor(r.AnchorB);
+            bool touch = false;
+            for (int p = 0; p < parts.Count; p++)
+            {
+                if (parts[p] == pa || parts[p] == pb)
+                {
+                    touch = true;
+                    break;
+                }
+            }
+            if (!touch)
+                continue;
+            r.DropJoint();
+            if (pa != null)
+                r.BodyA = pa.IslandRootBody();
+            if (pb != null)
+                r.BodyB = pb.IslandRootBody();
+            r.RebuildJoint();
+        }
+    }
+
+    public static void DropJointsOn(Rigidbody body)
+    {
+        if (body == null)
+            return;
+        for (int i = 0; i < All.Count; i++)
+        {
+            var r = All[i];
+            if (r == null)
+                continue;
+            if (r.BodyA == body || r.BodyB == body || (r._joint != null && (r._joint.connectedBody == body || r._joint.gameObject == body.gameObject)))
+                r.DropJoint();
+        }
+    }
+
+    public static void DropJointsOnIsland(System.Collections.Generic.IList<BoatPiece> parts)
+    {
+        if (parts == null)
+            return;
+        for (int i = 0; i < parts.Count; i++)
+        {
+            if (parts[i] != null)
+                DropJointsOn(parts[i].Body);
+        }
+    }
+
+    void DropJoint()
     {
         if (_joint != null)
-            Destroy(_joint);
+            Object.DestroyImmediate(_joint);
         _joint = null;
+    }
+
+    void RebuildJoint()
+    {
+        DropJoint();
         BuildJoint();
         RestoreVisual();
     }
@@ -250,6 +325,8 @@ public class BoatRope : MonoBehaviour
     void BuildJoint()
     {
         if (BodyA == null || BodyB == null || AnchorA == null || AnchorB == null)
+            return;
+        if (BodyA == BodyB)
             return;
         _joint = BodyA.gameObject.AddComponent<SpringJoint>();
         _joint.connectedBody = BodyB;

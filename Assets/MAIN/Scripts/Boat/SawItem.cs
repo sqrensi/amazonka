@@ -6,6 +6,7 @@ using UnityEngine.InputSystem;
 /// </summary>
 public class SawItem : HeldItem
 {
+    protected override bool SinksInWater => true;
     const float SawTime = 0.55f;
     LineRenderer _line;
     BoatPiece _target;

@@ -135,6 +135,37 @@ public static class HorrorPaperUI
         return t;
     }
 
+    public static Canvas HudCanvas(string name, int sortingOrder = 70)
+    {
+        var go = new GameObject(name, typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        var canvas = go.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = sortingOrder;
+        var scaler = go.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920, 1080);
+        scaler.matchWidthOrHeight = 0.5f;
+        return canvas;
+    }
+
+    public static void Pin(RectTransform rt, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 anchored, Vector2 size)
+    {
+        rt.anchorMin = anchorMin;
+        rt.anchorMax = anchorMax;
+        rt.pivot = pivot;
+        rt.anchoredPosition = anchored;
+        rt.sizeDelta = size;
+    }
+
+    public static void Fill(RectTransform rt, Vector2 offsetMin, Vector2 offsetMax)
+    {
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.offsetMin = offsetMin;
+        rt.offsetMax = offsetMax;
+    }
+
     static Sprite Bake(Kind kind)
     {
         switch (kind)

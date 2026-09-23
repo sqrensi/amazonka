@@ -5,6 +5,7 @@ using UnityEngine;
 /// </summary>
 public class PistolItem : HeldItem
 {
+    protected override bool SinksInWater => true;
     [Header("Ballistics")]
     [SerializeField] float damage = 50f;
     [SerializeField] float range = 120f;
@@ -140,7 +141,13 @@ public class PistolItem : HeldItem
 
         var target = hit.collider.GetComponentInParent<IDamageable>();
         if (target != null && !target.IsDead)
-            target.TakeDamage(damage, hit.point, dir);
+        {
+            var actor = RaceRoster.Local();
+            if (actor != null)
+                actor.WeaponName = DisplayName;
+            ushort id = actor != null ? actor.Id : (ushort)0;
+            RaceSim.RequestDamage(id, target, SharkDamage(target), hit.point, dir, DisplayName);
+        }
 
         Rigidbody body = hit.rigidbody != null ? hit.rigidbody : hit.collider.attachedRigidbody;
         if (body == null || body.isKinematic)
@@ -151,6 +158,13 @@ public class PistolItem : HeldItem
         Vector3 forceDir = dir.sqrMagnitude > 0.001f ? dir.normalized : hit.normal * -1f;
         body.AddForceAtPosition(forceDir * bulletImpulse, hit.point, ForceMode.Impulse);
         body.AddTorque(Vector3.Cross(forceDir, Random.onUnitSphere) * (bulletImpulse * 0.18f), ForceMode.Impulse);
+    }
+
+    float SharkDamage(IDamageable target)
+    {
+        if (target is RiverShark)
+            return 64f;
+        return damage;
     }
 
     bool IsOwnHit(Collider col)

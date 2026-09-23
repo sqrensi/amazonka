@@ -1,8 +1,8 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 /// <summary>
-/// Прибитое весло: R сесть/выйти, WASD грести. Пока гребёшь — без подсказок и без предметов.
+/// Прибитое весло: R сесть/выйти, WASD грести. Уключина стоит, древко качается.
+/// W/S вдоль весла (локальный +X, перпендикуляр к древку), A/D поворот, вместе — диагональ.
 /// </summary>
 public class BoatOarStation : MonoBehaviour
 {
@@ -12,8 +12,9 @@ public class BoatOarStation : MonoBehaviour
 
     HorrorFirstPersonController _move;
     BoatPiece _oar;
+    Rigidbody _boundRoot;
     float _stroke;
-    float _angle;
+    float _pitch;
     Transform[] _parts;
     Vector3[] _restPos;
     Quaternion[] _restRot;
@@ -37,10 +38,26 @@ public class BoatOarStation : MonoBehaviour
 
     public static void AbortIfIsland(BoatPiece piece, string hint = null)
     {
-        if (Active == null || Active._oar == null || piece == null)
+        if (Active == null || Active._oar == null)
             return;
-        if (piece == Active._oar || piece.SharesIslandWith(Active._oar))
-            Abort(hint);
+        if (!Active._oar.OarIsMounted())
+            Active.FinishRow(null, string.IsNullOrEmpty(hint) ? "Oar came off" : hint);
+    }
+
+    void FinishRow(BoatPiece stayOn, string hint = null)
+    {
+        if (_move != null)
+        {
+            if (stayOn != null)
+                _move.BindBoatFollow(stayOn);
+            else
+            {
+                var hull = StandPiece();
+                if (hull != null)
+                    _move.BindBoatFollow(hull);
+            }
+        }
+        Abort(hint);
     }
 
     public static void Toggle(GameObject player, BoatPiece oar)
@@ -71,7 +88,11 @@ public class BoatOarStation : MonoBehaviour
         if (_move != null)
         {
             _move.MovementLocked = true;
-            _move.BindBoatFollow();
+            var hull = oar.IslandLeader() ?? oar;
+            _move.BindBoatFollow(hull);
+            _boundRoot = hull.IslandRootBody();
+            if (_move.TryGetComponent(out CharacterController cc))
+                cc.enabled = false;
         }
         CacheStroke();
         BoatBuildHud.Clear();
@@ -81,7 +102,11 @@ public class BoatOarStation : MonoBehaviour
     {
         ResetStroke();
         if (_move != null)
+        {
             _move.MovementLocked = false;
+            if (_move.TryGetComponent(out CharacterController cc))
+                cc.enabled = true;
+        }
         if (Active == this)
             Active = null;
         BoatBuildHud.Clear();
@@ -110,15 +135,15 @@ public class BoatOarStation : MonoBehaviour
 
     void ResetStroke()
     {
-        _angle = 0f;
-        ApplyStroke(0f);
+        _pitch = 0f;
+        ApplyStroke(0f, 0f);
     }
 
-    void ApplyStroke(float angle)
+    void ApplyStroke(float pitch, float yaw)
     {
         if (_parts == null || _oar == null)
             return;
-        Quaternion swing = Quaternion.Euler(angle, BoatPaddle.Steer * 0.35f, 0f);
+        Quaternion swing = Quaternion.Euler(pitch, yaw, 0f);
         for (int i = 0; i < _parts.Length; i++)
         {
             Transform t = _parts[i];
@@ -134,41 +159,76 @@ public class BoatOarStation : MonoBehaviour
     {
         if (_oar == null || !_oar.isActiveAndEnabled)
         {
-            Abort("Oar came off");
+            FinishRow(null, "Oar came off");
             return;
         }
-        if (!_oar.HasDrivenNail())
+        if (!_oar.OarIsMounted())
         {
-            Abort("Oar came off");
+            FinishRow(StandPiece(), "Oar came off");
             return;
         }
-        if (_oar.HullFlood >= 0.2f)
+
+        var stand = StandPiece();
+        if (stand != null && !stand.SharesIslandWith(_oar))
         {
-            Abort("Boat is flooding");
+            FinishRow(stand);
             return;
         }
-        if (Vector3.Distance(transform.position, _oar.transform.position) > 3.2f)
+
+        if (HullGoingUnder())
         {
-            Abort();
+            FinishRow(null, "Boat going under");
             return;
         }
-        if (_move != null && _move.IsSwimming)
+
+        var hull = _oar.IslandLeader() ?? _oar;
+        var root = hull.IslandRootBody();
+        if (_move != null && root != null && root != _boundRoot)
         {
-            Abort();
-            return;
+            _boundRoot = root;
+            _move.BindBoatFollow(hull);
         }
 
         Vector2 input = _move != null ? _move.MoveInput : Vector2.zero;
         BoatPaddle.TickSteer(Time.deltaTime, input.x);
-        bool rowing = Mathf.Abs(input.y) > 0.08f;
-        if (rowing)
+        bool drive = Mathf.Abs(input.y) > 0.08f;
+        if (drive)
             _stroke += Time.deltaTime * 11.2f;
         else
             _stroke = Mathf.MoveTowards(_stroke, 0f, Time.deltaTime * 4f);
-        float amp = 7.2f;
-        float target = rowing ? Mathf.Sin(_stroke) * amp * Mathf.Sign(input.y) : 0f;
-        _angle = Mathf.Lerp(_angle, target, 1f - Mathf.Exp(-7.5f * Time.deltaTime));
-        ApplyStroke(_angle);
+        float targetPitch = drive ? Mathf.Sin(_stroke) * 11f * Mathf.Sign(input.y) : 0f;
+        _pitch = Mathf.Lerp(_pitch, targetPitch, 1f - Mathf.Exp(-8f * Time.deltaTime));
+        ApplyStroke(_pitch, BoatPaddle.Steer * 0.4f);
+    }
+
+    bool HullGoingUnder()
+    {
+        var lead = _oar != null ? _oar.IslandLeader() ?? _oar : null;
+        if (lead == null)
+            return false;
+        return lead.HullFlood >= 0.88f || lead.DeckSubmerged();
+    }
+
+    BoatPiece StandPiece()
+    {
+        Vector3 origin = transform.position + Vector3.up * 0.45f;
+        var hits = Physics.RaycastAll(origin, Vector3.down, 2.8f, ~0, QueryTriggerInteraction.Ignore);
+        float best = float.PositiveInfinity;
+        BoatPiece found = null;
+        for (int i = 0; i < hits.Length; i++)
+        {
+            var hit = hits[i];
+            if (hit.collider == null || hit.distance >= best)
+                continue;
+            if (hit.collider.GetComponentInParent<BoatWater>() != null)
+                continue;
+            var piece = hit.collider.GetComponentInParent<BoatPiece>();
+            if (piece == null || piece.Kind == BoatPieceKind.Oar)
+                continue;
+            best = hit.distance;
+            found = piece;
+        }
+        return found;
     }
 
     void FixedUpdate()
@@ -176,28 +236,20 @@ public class BoatOarStation : MonoBehaviour
         if (_oar == null)
             return;
         Vector2 input = _move != null ? _move.MoveInput : Vector2.zero;
-        Rigidbody boat = _oar.IslandRootBody();
-        if (boat == null)
-            return;
+        bool drive = Mathf.Abs(input.y) > 0.08f;
+        bool steer = Mathf.Abs(input.x) > 0.08f;
 
-        Vector3 av = boat.angularVelocity;
-        Vector3 yaw = Vector3.Project(av, Vector3.up);
-        Vector3 roll = av - yaw;
-        boat.AddTorque(-roll * 5.5f, ForceMode.Acceleration);
-
-        if (Mathf.Abs(input.x) > 0.08f)
-            boat.AddTorque(Vector3.up * (input.x * 5.2f), ForceMode.Acceleration);
-
-        if (Mathf.Abs(input.y) < 0.08f)
+        var hull = _oar.IslandLeader() ?? _oar;
+        if (drive && !steer)
+            BoatPaddle.DampIslandYaw(hull, 6.5f);
+        if (steer)
+            BoatPaddle.YawIsland(hull, input.x * 5.4f);
+        if (!drive)
             return;
-        if (!BoatPaddle.PieceBladeInWater(_oar))
-            return;
-        Vector3 fwd = boat.transform.forward;
-        fwd.y = 0f;
+        Vector3 fwd = hull.CraftForward();
         if (fwd.sqrMagnitude < 0.0001f)
             return;
-        fwd.Normalize();
-        float pulse = 0.62f + 0.38f * Mathf.Abs(Mathf.Sin(_stroke));
-        boat.AddForce(fwd * (input.y * 155f * pulse), ForceMode.Force);
+        float pulse = 0.72f + 0.28f * Mathf.Abs(Mathf.Sin(_stroke));
+        BoatPaddle.PushIsland(hull, fwd * (input.y * 9f * pulse), ForceMode.Acceleration);
     }
 }
