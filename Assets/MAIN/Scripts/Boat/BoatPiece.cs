@@ -33,6 +33,8 @@ public class BoatPiece : MonoBehaviour, IInteractable
     static readonly List<BoatPiece> IslandTmp = new List<BoatPiece>(32);
     static readonly HashSet<BoatPiece> IslandSeen = new HashSet<BoatPiece>();
     static readonly Collider[] OverlapScratch = new Collider[48];
+    Renderer[] _lookRends;
+    float _wetShown = -1f;
 
     public float Strain { get; internal set; }
     public float HullLift { get; internal set; } = 1f;
@@ -47,6 +49,20 @@ public class BoatPiece : MonoBehaviour, IInteractable
     public Rigidbody Body => _rb;
     public Vector3 PieceSize => pieceSize;
     public Vector3 ColliderCenter => _box != null ? _box.center : _colCenter;
+    public Renderer[] LookRenderers
+    {
+        get
+        {
+            if (_lookRends == null || _lookRends.Length == 0)
+                _lookRends = GetComponentsInChildren<Renderer>(false);
+            return _lookRends;
+        }
+    }
+    public float WetShown
+    {
+        get => _wetShown;
+        set => _wetShown = value;
+    }
     public IReadOnlyList<BoatNail> Nails => _nails;
 
     public string GetPrompt()
@@ -930,6 +946,18 @@ public class BoatPiece : MonoBehaviour, IInteractable
 
     void LateUpdate()
     {
+        BoatWetLook.Apply(this);
+        if (kind == BoatPieceKind.Oar || _rb == null)
+            return;
+        Vector3 v = _rb.linearVelocity;
+        v.y = 0f;
+        float speed = v.magnitude;
+        if (speed < 1.1f)
+            return;
+        Vector3 at = transform.position;
+        if (BoatWater.TryHeight(at, out float y))
+            at.y = y;
+        BoatWaterFx.Wake(at, -CraftForward(), speed);
     }
 
     public float OwnMass()
@@ -1771,6 +1799,8 @@ public class BoatPiece : MonoBehaviour, IInteractable
         }
         else
             BoatVisuals.ApplyBarkUv(rend, _barkAcross, _barkAlong, _uv0, _uv1);
+        _lookRends = vis != null ? vis.GetComponentsInChildren<Renderer>(false) : null;
+        _wetShown = -1f;
     }
 
     void ApplyPhysics()

@@ -85,6 +85,8 @@ public class BoatRaceMode : MonoBehaviour
         _sharks = GetComponent<SharkDirector>();
         if (_sharks == null)
             _sharks = gameObject.AddComponent<SharkDirector>();
+        if (GetComponent<RockfallDirector>() == null)
+            gameObject.AddComponent<RockfallDirector>();
         BoatWater.CurrentEnabled = false;
         BoatLayers.Ensure();
     }

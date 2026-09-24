@@ -815,6 +815,7 @@ public class RiverShark : MonoBehaviour, IDamageable
         boatVel.y = 0f;
         float boat = boatVel.magnitude;
         float extra = 1.35f * _kindSpeed;
+        extra += Mathf.Lerp(0f, 2.8f, Mathf.InverseLerp(10f, 32f, range)) * _kindSpeed;
         extra += _rage * 0.4f;
         if (_pass == Pass.Lunge)
             extra += 0.55f;

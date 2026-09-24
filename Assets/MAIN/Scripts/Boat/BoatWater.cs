@@ -77,6 +77,9 @@ public class BoatWater : MonoBehaviour
     void LateUpdate()
     {
         UpdateUnderside();
+        var cam = Camera.main;
+        if (cam != null)
+            BoatWaterSkin.TickAround(cam.transform.position);
     }
 
     void UpdateUnderside()

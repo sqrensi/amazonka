@@ -215,6 +215,8 @@ public class HorrorFirstPersonController : MonoBehaviour
             playerCamera.gameObject.AddComponent<UnderwaterFx>();
         if (playerCamera != null && playerCamera.GetComponent<AtmosphereFog>() == null)
             playerCamera.gameObject.AddComponent<AtmosphereFog>();
+        if (playerCamera != null && playerCamera.GetComponent<GameLook>() == null)
+            playerCamera.gameObject.AddComponent<GameLook>();
 
         if (footstepSource == null)
             footstepSource = GetComponent<AudioSource>();

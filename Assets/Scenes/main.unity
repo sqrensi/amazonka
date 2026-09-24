@@ -222,15 +222,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 2645007069261488038, guid: 0644c8f3f8a8b7643857e521dbb1c401, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 245.191
+      value: 245.941
       objectReference: {fileID: 0}
     - target: {fileID: 2645007069261488038, guid: 0644c8f3f8a8b7643857e521dbb1c401, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 10.06
+      value: -1.0599997
       objectReference: {fileID: 0}
     - target: {fileID: 2645007069261488038, guid: 0644c8f3f8a8b7643857e521dbb1c401, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 399.947
+      value: 396.87698
       objectReference: {fileID: 0}
     - target: {fileID: 2645007069261488038, guid: 0644c8f3f8a8b7643857e521dbb1c401, type: 3}
       propertyPath: m_LocalRotation.w
@@ -427,6 +427,100 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!1 &89599948
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 89599949}
+  - component: {fileID: 89599950}
+  m_Layer: 0
+  m_Name: RockfallPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &89599949
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 89599948}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.16484816, y: -0.17612448, z: 0.029931601, w: 0.97000486}
+  m_LocalPosition: {x: -53.66, y: 12.85, z: -152.14}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &89599950
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 89599948}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
+--- !u!1 &100336957
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 100336958}
+  - component: {fileID: 100336959}
+  m_Layer: 0
+  m_Name: RockfallPoint (7)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &100336958
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100336957}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.022735672, y: 0.98461837, z: -0.14367715, w: 0.09678184}
+  m_LocalPosition: {x: -222.32, y: 70.93, z: -184.74}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 16.698, y: 168.921, z: 1.015}
+--- !u!114 &100336959
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100336957}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &102902089
 GameObject:
   m_ObjectHideFlags: 0
@@ -603,6 +697,7 @@ Transform:
   - {fileID: 973271863}
   - {fileID: 181939670}
   - {fileID: 192200010}
+  - {fileID: 1275590696}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &128383699
@@ -1366,6 +1461,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &292791847
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 292791848}
+  - component: {fileID: 292791849}
+  m_Layer: 0
+  m_Name: RockfallPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &292791848
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 292791847}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.16744913, y: 0.033082444, z: -0.0056222193, w: 0.9853095}
+  m_LocalPosition: {x: 172.85, y: 16.71, z: -438.21}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &292791849
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 292791847}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &307796970
 GameObject:
   m_ObjectHideFlags: 0
@@ -1397,6 +1539,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &309675565
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 309675566}
+  - component: {fileID: 309675567}
+  m_Layer: 0
+  m_Name: RockfallPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &309675566
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 309675565}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.14591698, y: 0.4844781, z: -0.08233497, w: 0.85860944}
+  m_LocalPosition: {x: 158.67, y: 27.72, z: 113.21}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &309675567
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 309675565}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &310635220
 GameObject:
   m_ObjectHideFlags: 0
@@ -1586,7 +1775,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  - {fileID: 2100000, guid: 5bc66a67154f60e40b8fbc6d09995f87, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1627,8 +1816,8 @@ Transform:
   m_GameObject: {fileID: 354854680}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 242.77, y: 6.83, z: 400.07}
-  m_LocalScale: {x: 13.478254, y: 1, z: 8.088916}
+  m_LocalPosition: {x: 242.9, y: -5.39, z: 398.1}
+  m_LocalScale: {x: 14.714931, y: 1, z: 12.599223}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -1664,6 +1853,107 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!21 &368561019
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Horror/Terrain Lit Triplanar
+  m_Shader: {fileID: 4800000, guid: d56e55f07a446fd4b9398bf004ce187f, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _Control:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Mask0:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Mask1:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Mask2:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Mask3:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Normal0:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Normal1:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Normal2:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Normal3:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Splat0:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Splat1:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Splat2:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Splat3:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _TerrainHolesTexture:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _EnableHeightBlend: 0
+    - _EnableInstancedPerPixelNormal: 1
+    - _HeightTransition: 0
+    - _Metallic0: 0
+    - _Metallic1: 0
+    - _Metallic2: 0
+    - _Metallic3: 0
+    - _NumLayersCount: 1
+    - _Smoothness0: 0.5
+    - _Smoothness1: 0.5
+    - _Smoothness2: 0.5
+    - _Smoothness3: 0.5
+    m_Colors:
+    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &374634490
 GameObject:
   m_ObjectHideFlags: 0
@@ -1850,6 +2140,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &428892529
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 428892530}
+  - component: {fileID: 428892531}
+  m_Layer: 0
+  m_Name: RockfallPoint (3)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &428892530
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 428892529}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.12748703, y: 0.5267073, z: -0.07005033, w: 0.8375079}
+  m_LocalPosition: {x: -77.5, y: 47, z: -318.6}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 16.698, y: 64.48, z: 1.015}
+--- !u!114 &428892531
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 428892529}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &435020638
 GameObject:
   m_ObjectHideFlags: 0
@@ -1979,15 +2316,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5564000762801623391, guid: d491371ae6f38ab4195f5a7aae1adb7b, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 242.79
+      value: 243.54
       objectReference: {fileID: 0}
     - target: {fileID: 5564000762801623391, guid: d491371ae6f38ab4195f5a7aae1adb7b, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 10.06
+      value: -1.06
       objectReference: {fileID: 0}
     - target: {fileID: 5564000762801623391, guid: d491371ae6f38ab4195f5a7aae1adb7b, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 400.65
+      value: 397.58
       objectReference: {fileID: 0}
     - target: {fileID: 5564000762801623391, guid: d491371ae6f38ab4195f5a7aae1adb7b, type: 3}
       propertyPath: m_LocalRotation.w
@@ -2154,6 +2491,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &553159389
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 553159390}
+  - component: {fileID: 553159391}
+  m_Layer: 0
+  m_Name: RockfallPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &553159390
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 553159389}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.10485701, y: -0.76891905, z: 0.13067448, w: 0.617003}
+  m_LocalPosition: {x: 87.66, y: 28.08, z: 39.36}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &553159391
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 553159389}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &553828044
 GameObject:
   m_ObjectHideFlags: 0
@@ -2340,6 +2724,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &691276811
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 691276812}
+  - component: {fileID: 691276813}
+  m_Layer: 0
+  m_Name: RockfallPoint (2)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &691276812
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 691276811}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.12748703, y: 0.5267073, z: -0.07005033, w: 0.8375079}
+  m_LocalPosition: {x: -113.6, y: 13.76, z: -268.7}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 16.698, y: 64.48, z: 1.015}
+--- !u!114 &691276813
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 691276811}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &698609295
 GameObject:
   m_ObjectHideFlags: 0
@@ -2613,7 +3044,7 @@ Transform:
   m_GameObject: {fileID: 823511863}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 242.09, y: 8.19, z: 399.68}
+  m_LocalPosition: {x: 244.49, y: -4.16, z: 395.34}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2805,6 +3236,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &943443518
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 943443519}
+  - component: {fileID: 943443520}
+  m_Layer: 0
+  m_Name: RockfallPoint (9)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &943443519
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 943443518}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.12459209, y: 0.5596879, z: -0.07507881, w: 0.81583667}
+  m_LocalPosition: {x: -192.57, y: 21.54, z: -80.23}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 16.698, y: 69.051, z: 1.015}
+--- !u!114 &943443520
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 943443518}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &954111167
 GameObject:
   m_ObjectHideFlags: 0
@@ -2836,6 +3314,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &961006818
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 961006819}
+  - component: {fileID: 961006820}
+  m_Layer: 0
+  m_Name: RockfallPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &961006819
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 961006818}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.14348976, y: 0.5089608, z: -0.0864957, w: 0.8443271}
+  m_LocalPosition: {x: 107.78, y: 27.627777, z: -399.85}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &961006820
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 961006818}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1001 &971017512
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2850,15 +3375,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7151667956084909839, guid: b809b612cba24814a824766deb70bedb, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 244.277
+      value: 245.027
       objectReference: {fileID: 0}
     - target: {fileID: 7151667956084909839, guid: b809b612cba24814a824766deb70bedb, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 10.06
+      value: -1.0599997
       objectReference: {fileID: 0}
     - target: {fileID: 7151667956084909839, guid: b809b612cba24814a824766deb70bedb, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 400.15497
+      value: 397.08496
       objectReference: {fileID: 0}
     - target: {fileID: 7151667956084909839, guid: b809b612cba24814a824766deb70bedb, type: 3}
       propertyPath: m_LocalRotation.w
@@ -2890,7 +3415,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7852106703172968400, guid: b809b612cba24814a824766deb70bedb, type: 3}
       propertyPath: bulletImpulse
-      value: 151.4
+      value: 25
       objectReference: {fileID: 0}
     - target: {fileID: 7852106703172968400, guid: b809b612cba24814a824766deb70bedb, type: 3}
       propertyPath: muzzleFlashPrefab
@@ -3087,6 +3612,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1034638693
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1034638694}
+  - component: {fileID: 1034638695}
+  m_Layer: 0
+  m_Name: RockfallPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1034638694
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1034638693}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.13067448, y: 0.617003, z: -0.10485701, w: 0.76891905}
+  m_LocalPosition: {x: 0.7, y: 26.9, z: -215.3}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1034638695
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1034638693}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &1040611280
 GameObject:
   m_ObjectHideFlags: 0
@@ -3118,6 +3690,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1050331716
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1050331717}
+  - component: {fileID: 1050331718}
+  m_Layer: 0
+  m_Name: RockfallPoint (6)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1050331717
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1050331716}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.022735672, y: 0.98461837, z: -0.14367715, w: 0.09678184}
+  m_LocalPosition: {x: -201.52, y: 64.53, z: -294.28}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 16.698, y: 168.921, z: 1.015}
+--- !u!114 &1050331718
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1050331716}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &1057406776
 GameObject:
   m_ObjectHideFlags: 0
@@ -3211,6 +3830,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1068539203
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1068539204}
+  - component: {fileID: 1068539205}
+  m_Layer: 0
+  m_Name: RockfallPoint (10)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1068539204
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1068539203}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.12459209, y: 0.5596879, z: -0.07507881, w: 0.81583667}
+  m_LocalPosition: {x: -249, y: 25.8, z: -40.7}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 16.698, y: 69.051, z: 1.015}
+--- !u!114 &1068539205
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1068539203}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &1165887817
 GameObject:
   m_ObjectHideFlags: 0
@@ -3242,6 +3908,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1174442472
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1174442473}
+  - component: {fileID: 1174442474}
+  m_Layer: 0
+  m_Name: RockfallPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1174442473
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1174442472}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.029931603, y: 0.97000486, z: -0.16484818, w: 0.17612448}
+  m_LocalPosition: {x: -193.06, y: 17.29, z: -2.22}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1174442474
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1174442472}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &1180862837
 GameObject:
   m_ObjectHideFlags: 0
@@ -3397,6 +4110,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1255743357
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1255743358}
+  - component: {fileID: 1255743359}
+  m_Layer: 0
+  m_Name: RockfallPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1255743358
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1255743357}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.0056222193, y: 0.9853095, z: -0.16744913, w: -0.033082444}
+  m_LocalPosition: {x: 184.35, y: 15.37, z: -390.32}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1255743359
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1255743357}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &1270550301
 GameObject:
   m_ObjectHideFlags: 0
@@ -3427,6 +4187,63 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 192200010}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1275590695
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1275590696}
+  m_Layer: 0
+  m_Name: RockfallPoints
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1275590696
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1275590695}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1980981976}
+  - {fileID: 1957935564}
+  - {fileID: 2021489278}
+  - {fileID: 1308551705}
+  - {fileID: 1255743358}
+  - {fileID: 292791848}
+  - {fileID: 1561134966}
+  - {fileID: 961006819}
+  - {fileID: 1579203135}
+  - {fileID: 1647694076}
+  - {fileID: 553159390}
+  - {fileID: 1034638694}
+  - {fileID: 89599949}
+  - {fileID: 1842545307}
+  - {fileID: 691276812}
+  - {fileID: 428892530}
+  - {fileID: 2113170328}
+  - {fileID: 2057818272}
+  - {fileID: 1050331717}
+  - {fileID: 100336958}
+  - {fileID: 2145181311}
+  - {fileID: 943443519}
+  - {fileID: 1068539204}
+  - {fileID: 1174442473}
+  - {fileID: 1329221276}
+  - {fileID: 309675566}
+  m_Father: {fileID: 115138188}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1275753055
 GameObject:
@@ -3583,6 +4400,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1308551704
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1308551705}
+  - component: {fileID: 1308551706}
+  m_Layer: 0
+  m_Name: RockfallPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1308551705
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1308551704}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.15553887, y: -0.36645487, z: 0.06227744, w: 0.91522676}
+  m_LocalPosition: {x: 351.01, y: 42.72, z: -335.3}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1308551706
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1308551704}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &1327619973
 GameObject:
   m_ObjectHideFlags: 0
@@ -3614,6 +4478,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1329221275
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1329221276}
+  - component: {fileID: 1329221277}
+  m_Layer: 0
+  m_Name: RockfallPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1329221276
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1329221275}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.08233497, y: 0.85860944, z: -0.14591698, w: -0.4844781}
+  m_LocalPosition: {x: 188.2, y: 50.5, z: -15}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1329221277
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1329221275}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &1335687950
 GameObject:
   m_ObjectHideFlags: 0
@@ -4141,6 +5052,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1561134965
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1561134966}
+  - component: {fileID: 1561134967}
+  m_Layer: 0
+  m_Name: RockfallPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1561134966
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1561134965}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.08649571, y: -0.8443271, z: 0.14348976, w: 0.5089607}
+  m_LocalPosition: {x: 139.76, y: 23.76, z: -384.7}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1561134967
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1561134965}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &1568703350
 GameObject:
   m_ObjectHideFlags: 0
@@ -4172,6 +5130,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1579203134
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1579203135}
+  - component: {fileID: 1579203136}
+  m_Layer: 0
+  m_Name: RockfallPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1579203135
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1579203134}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.12518309, y: -0.6552406, z: 0.11135533, w: 0.73660636}
+  m_LocalPosition: {x: 130.9, y: 44.7, z: -202.2}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1579203136
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1579203134}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &1579467888
 GameObject:
   m_ObjectHideFlags: 0
@@ -4451,6 +5456,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1647694075
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1647694076}
+  - component: {fileID: 1647694077}
+  m_Layer: 0
+  m_Name: RockfallPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1647694076
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1647694075}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.11135535, y: 0.7366064, z: -0.12518309, w: 0.6552406}
+  m_LocalPosition: {x: 57.2, y: 32.72, z: -316.5}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1647694077
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1647694075}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &1659244625
 GameObject:
   m_ObjectHideFlags: 0
@@ -4939,7 +5991,7 @@ Terrain:
   m_StaticShadowCaster: 0
   m_IgnoreQualitySettings: 0
   m_ReflectionProbeUsage: 1
-  m_MaterialTemplate: {fileID: 1925064541}
+  m_MaterialTemplate: {fileID: 368561019}
   m_BakeLightProbesForTrees: 1
   m_PreserveTreePrototypeLayers: 0
   m_DeringLightProbesForTrees: 1
@@ -5259,6 +6311,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1842545306
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1842545307}
+  - component: {fileID: 1842545308}
+  m_Layer: 0
+  m_Name: RockfallPoint (1)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1842545307
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1842545306}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.12404417, y: -0.46615893, z: 0.07598026, w: 0.87266034}
+  m_LocalPosition: {x: -26, y: 12.85, z: -207.5}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 16.698, y: -56.072, z: 1.015}
+--- !u!114 &1842545308
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1842545306}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &1869227735
 GameObject:
   m_ObjectHideFlags: 0
@@ -5476,107 +6575,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!21 &1925064541
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: Horror/Terrain Lit Triplanar
-  m_Shader: {fileID: 4800000, guid: d56e55f07a446fd4b9398bf004ce187f, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs:
-    - _Control:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _MainTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _Mask0:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _Mask1:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _Mask2:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _Mask3:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _Normal0:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _Normal1:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _Normal2:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _Normal3:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _Splat0:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _Splat1:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _Splat2:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _Splat3:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _TerrainHolesTexture:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    m_Ints: []
-    m_Floats:
-    - _EnableHeightBlend: 0
-    - _EnableInstancedPerPixelNormal: 1
-    - _HeightTransition: 0
-    - _Metallic0: 0
-    - _Metallic1: 0
-    - _Metallic2: 0
-    - _Metallic3: 0
-    - _NumLayersCount: 1
-    - _Smoothness0: 0.5
-    - _Smoothness1: 0.5
-    - _Smoothness2: 0.5
-    - _Smoothness3: 0.5
-    m_Colors:
-    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1 &1935469657
 GameObject:
   m_ObjectHideFlags: 0
@@ -5639,6 +6637,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1957935563
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1957935564}
+  - component: {fileID: 1957935565}
+  m_Layer: 0
+  m_Name: RockfallPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1957935564
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1957935563}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.12009945, y: -0.6873967, z: 0.11682013, w: 0.706693}
+  m_LocalPosition: {x: 374.46, y: 126.81, z: -23.84}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1957935565
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1957935563}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &1962767711
 GameObject:
   m_ObjectHideFlags: 0
@@ -5701,6 +6746,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1980981975
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1980981976}
+  - component: {fileID: 1980981977}
+  m_Layer: 0
+  m_Name: RockfallPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1980981976
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1980981975}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.116820134, y: 0.706693, z: -0.12009944, w: 0.68739676}
+  m_LocalPosition: {x: 308.7, y: 49.9, z: -7.1}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1980981977
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1980981975}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &1994819004
 GameObject:
   m_ObjectHideFlags: 0
@@ -5825,6 +6917,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2021489277
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2021489278}
+  - component: {fileID: 2021489279}
+  m_Layer: 0
+  m_Name: RockfallPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2021489278
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2021489277}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.06227744, y: 0.91522676, z: -0.15553887, w: 0.36645487}
+  m_LocalPosition: {x: 297.15, y: 12.54, z: -269.38}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2021489279
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2021489277}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &2029241663
 GameObject:
   m_ObjectHideFlags: 0
@@ -5918,6 +7057,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2057818271
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2057818272}
+  - component: {fileID: 2057818273}
+  m_Layer: 0
+  m_Name: RockfallPoint (5)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2057818272
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2057818271}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.14545473, y: 0.04663804, z: 0.0017170166, w: 0.9882636}
+  m_LocalPosition: {x: -128.2, y: 59.2, z: -401.5}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 16.698, y: 5.553, z: 1.015}
+--- !u!114 &2057818273
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2057818271}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &2059546469
 GameObject:
   m_ObjectHideFlags: 0
@@ -6042,6 +7228,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2113170327
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2113170328}
+  - component: {fileID: 2113170329}
+  m_Layer: 0
+  m_Name: RockfallPoint (4)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2113170328
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2113170327}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.07937074, y: -0.7958569, z: 0.12190267, w: 0.58775145}
+  m_LocalPosition: {x: 23.58, y: 34.62, z: -332.47}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 16.698, y: -106.958, z: 1.015}
+--- !u!114 &2113170329
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2113170327}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &2113625162
 GameObject:
   m_ObjectHideFlags: 0
@@ -6135,6 +7368,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 192200010}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2145181310
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2145181311}
+  - component: {fileID: 2145181312}
+  m_Layer: 0
+  m_Name: RockfallPoint (8)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2145181311
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2145181310}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.09515798, y: 0.708869, z: -0.11002271, w: -0.6901774}
+  m_LocalPosition: {x: -137.16, y: 5.8, z: -138.33}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1275590696}
+  m_LocalEulerAnglesHint: {x: 16.698, y: 268.61798, z: 1.015}
+--- !u!114 &2145181312
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2145181310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dd4ad7945fb504f88f3a05e8714aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockfallPoint
+  interval: {x: 9, y: 22}
+  burst: {x: 1, y: 3}
+  throwSpeed: 7.5
 --- !u!1 &2146403584
 GameObject:
   m_ObjectHideFlags: 0

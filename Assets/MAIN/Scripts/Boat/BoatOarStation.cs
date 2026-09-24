@@ -21,6 +21,7 @@ public class BoatOarStation : MonoBehaviour
     float _rootCheckAt;
     float _rideRetryAt;
     float _drivePush;
+    float _rowDrive;
     Transform[] _parts;
     Vector3[] _restPos;
     Quaternion[] _restRot;
@@ -194,6 +195,7 @@ public class BoatOarStation : MonoBehaviour
 
         Vector2 input = _move != null ? _move.MoveInput : Vector2.zero;
         bool drive = Mathf.Abs(input.y) > 0.08f;
+        _rowDrive = drive ? input.y : 0f;
         float tick = Time.smoothDeltaTime;
         if (tick < 0.00005f)
             tick = Time.unscaledDeltaTime;
@@ -212,6 +214,12 @@ public class BoatOarStation : MonoBehaviour
         if (_oar == null)
             return;
         ApplyStroke(_pitch, _steerShow);
+        if (Mathf.Abs(_rowDrive) < 0.08f || !BoatPaddle.PieceBladeInWater(_oar))
+            return;
+        Transform blade = _oar.transform.Find("Blade");
+        Vector3 at = blade != null ? blade.position : _oar.transform.position;
+        Vector3 along = _oar.CraftForward() * Mathf.Sign(_rowDrive);
+        BoatWaterFx.Splash(at, along, 0.85f + Mathf.Abs(_drivePush) * 0.14f);
     }
 
     bool HullGoingUnder()
