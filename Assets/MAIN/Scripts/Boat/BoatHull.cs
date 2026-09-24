@@ -247,8 +247,10 @@ public static class BoatHull
         else if (!wet && lead.HullFlood > 0f)
             lead.HullFlood = Mathf.Max(0f, lead.HullFlood - dt * 0.02f);
 
-        float lift = 1f - lead.HullFlood * 0.92f;
-        float sink = lead.HullFlood * 16f;
+        float flood = Mathf.Clamp01(lead.HullFlood);
+        float drown = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.28f, 1f, flood));
+        float lift = Mathf.Lerp(1f, 0.22f, drown);
+        float sink = drown * 2.15f;
         for (int i = 0; i < Scratch.Count; i++)
         {
             var p = Scratch[i];
@@ -437,19 +439,18 @@ public static class BoatHull
         }
         if (pick == null)
             return;
-        float hit = Mathf.Clamp(power, 0.05f, 0.35f);
-        pick.Strain = Mathf.Clamp01(pick.Strain + hit * 5.5f);
-        lead.Strain = Mathf.Clamp01(lead.Strain + hit * 2.8f);
-        FailWeakestNail(lead, 0.7f);
+        float hit = Mathf.Clamp(power, 0.05f, 0.18f);
+        pick.Strain = Mathf.Clamp01(pick.Strain + hit * 2.2f);
+        lead.Strain = Mathf.Clamp01(lead.Strain + hit * 0.55f);
         if (pick.Strain < 0.92f)
         {
             if (hull <= 3)
-                lead.HullFlood = Mathf.Clamp01(lead.HullFlood + 0.008f);
+                lead.HullFlood = Mathf.Clamp01(lead.HullFlood + 0.004f);
             return;
         }
         RipPiece(pick, from);
         if (hull <= 2)
-            lead.HullFlood = Mathf.Clamp01(lead.HullFlood + 0.02f);
+            lead.HullFlood = Mathf.Clamp01(lead.HullFlood + 0.012f);
     }
 
     public static void RipPiece(BoatPiece piece, Vector3 from)

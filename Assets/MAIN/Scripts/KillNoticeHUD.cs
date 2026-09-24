@@ -13,6 +13,8 @@ public class KillNoticeHUD : MonoBehaviour
         public string target;
         public string weapon;
         public float distanceMeters;
+        public KillStyle.Tag[] tags;
+        public int points;
     }
 
     static int _kills;
@@ -22,6 +24,12 @@ public class KillNoticeHUD : MonoBehaviour
     Font _font;
 
     public static int NextKillIndex() => ++_kills;
+    public static int KillCount => _kills;
+
+    public static void ResetKills()
+    {
+        _kills = 0;
+    }
 
     public static void Show(Report report)
     {
@@ -86,34 +94,47 @@ public class KillNoticeHUD : MonoBehaviour
         rt.anchorMin = new Vector2(0.5f, 1f);
         rt.anchorMax = new Vector2(0.5f, 1f);
         rt.pivot = new Vector2(0.5f, 1f);
-        rt.sizeDelta = new Vector2(700, 168);
+        rt.sizeDelta = new Vector2(700, report.tags != null && report.tags.Length > 0 ? 210 : 168);
         rt.anchoredPosition = new Vector2(0f, -8f);
         var cg = root.GetComponent<CanvasGroup>();
         cg.alpha = 0f;
         rt.localScale = Vector3.one * 0.72f;
         rt.localEulerAngles = new Vector3(0f, 0f, Random.Range(-2.2f, 2.2f));
 
-        string flavor = Flavor(report.killIndex);
+        string flavor = Flavor(report);
         var title = MakeText(root.transform, "Flavor", flavor, 22, new Color(1f, 0.92f, 0.45f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
         Stretch(title.rectTransform, 0f, 8f, 0f, -4f);
-        title.rectTransform.anchoredPosition = new Vector2(0f, 58f);
+        title.rectTransform.anchoredPosition = new Vector2(0f, 70f);
         title.rectTransform.sizeDelta = new Vector2(680, 28);
 
         var num = MakeText(root.transform, "Index", $"#{report.killIndex:00}", 54, new Color(1f, 0.98f, 0.88f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
-        num.rectTransform.anchoredPosition = new Vector2(0f, 18f);
+        num.rectTransform.anchoredPosition = new Vector2(0f, 28f);
         num.rectTransform.sizeDelta = new Vector2(680, 58);
 
-        var target = MakeText(root.transform, "Target", report.target.ToUpperInvariant(), 26, new Color(0.65f, 1f, 0.78f, 1f), FontStyle.Italic, TextAnchor.MiddleCenter);
-        target.rectTransform.anchoredPosition = new Vector2(0f, -22f);
-        target.rectTransform.sizeDelta = new Vector2(680, 32);
+        string pts = report.points > 0 ? $"+{report.points}" : "";
+        var score = MakeText(root.transform, "Score", pts, 30, new Color(1f, 0.86f, 0.28f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        score.rectTransform.anchoredPosition = new Vector2(0f, -8f);
+        score.rectTransform.sizeDelta = new Vector2(680, 32);
+
+        var target = MakeText(root.transform, "Target", report.target.ToUpperInvariant(), 24, new Color(0.65f, 1f, 0.78f, 1f), FontStyle.Italic, TextAnchor.MiddleCenter);
+        target.rectTransform.anchoredPosition = new Vector2(0f, -40f);
+        target.rectTransform.sizeDelta = new Vector2(680, 28);
 
         string stats = $"{report.weapon}   ·   {report.distanceMeters:0.0} m";
-        var line = MakeText(root.transform, "Stats", stats, 20, new Color(1f, 1f, 1f, 0.92f), FontStyle.Normal, TextAnchor.MiddleCenter);
-        line.rectTransform.anchoredPosition = new Vector2(0f, -52f);
-        line.rectTransform.sizeDelta = new Vector2(680, 28);
+        if (report.tags != null && report.tags.Length > 0)
+        {
+            var names = new string[report.tags.Length];
+            for (int i = 0; i < report.tags.Length; i++)
+                names[i] = report.tags[i].name;
+            stats = string.Join("  ·  ", names) + "\n" + stats;
+        }
+        var line = MakeText(root.transform, "Stats", stats, 18, new Color(1f, 1f, 1f, 0.92f), FontStyle.Normal, TextAnchor.MiddleCenter);
+        line.rectTransform.anchoredPosition = new Vector2(0f, -78f);
+        line.rectTransform.sizeDelta = new Vector2(680, 48);
 
         SetAlpha(title, 0f);
         SetAlpha(num, 0f);
+        SetAlpha(score, 0f);
         SetAlpha(target, 0f);
         SetAlpha(line, 0f);
 
@@ -130,10 +151,11 @@ public class KillNoticeHUD : MonoBehaviour
         rt.localScale = Vector3.one;
         cg.alpha = 1f;
 
-        yield return FadeIn(title, 0.12f);
-        yield return FadeIn(num, 0.14f);
-        yield return FadeIn(target, 0.12f);
-        yield return FadeIn(line, 0.14f);
+        yield return FadeIn(title, 0.1f);
+        yield return FadeIn(num, 0.12f);
+        yield return FadeIn(score, 0.1f);
+        yield return FadeIn(target, 0.1f);
+        yield return FadeIn(line, 0.12f);
 
         float hold = 2.6f;
         float bob = 0f;
@@ -159,9 +181,26 @@ public class KillNoticeHUD : MonoBehaviour
         Destroy(root);
     }
 
-    static string Flavor(int n)
+    static string Flavor(Report report)
     {
+        if (report.tags != null)
+        {
+            for (int i = 0; i < report.tags.Length; i++)
+            {
+                if (report.tags[i].name == "360")
+                    return "AROUND THE WORLD";
+                if (report.tags[i].name == "180")
+                    return "TURN AND BURN";
+                if (report.tags[i].name == "FLICK")
+                    return "FLICKED";
+                if (report.tags[i].name == "AIR")
+                    return "MID-AIR";
+                if (report.tags[i].name == "DOUBLE")
+                    return "BACK TO BACK";
+            }
+        }
         string[] words = { "NICE", "GOT 'EM", "CLEAN", "DOWN", "POP", "CATCH" };
+        int n = Mathf.Max(1, report.killIndex);
         return words[(n - 1) % words.Length];
     }
 

@@ -50,3 +50,13 @@ crashlytics-build.properties
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# Heavy local texture packs (do not push)
+/Assets/ADG_Textures/
+/Assets/ADG_Textures.meta
+/Assets/MAIN/Textures/
+/Assets/MAIN/Textures.meta
+/Assets/TreeBarkMaterialPack/
+/Assets/TreeBarkMaterialPack.meta
+/Assets/YughuesFreeGroundMaterials/
+/Assets/YughuesFreeGroundMaterials.meta

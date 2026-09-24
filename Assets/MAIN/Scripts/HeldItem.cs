@@ -53,6 +53,7 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
     float _idleT;
 
     Rigidbody _rb;
+    float _kickUntil;
     Collider _col;
     bool _carried;
     Coroutine _ignoreRoutine;
@@ -395,6 +396,7 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
         }
         if (_rb != null)
         {
+            _rb.interpolation = RigidbodyInterpolation.Interpolate;
             _rb.detectCollisions = on;
             if (on)
             {
@@ -409,6 +411,20 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
             }
         }
         BoatLayers.BindPickup(this, on && !_carried);
+    }
+
+    public void KickFromShot(Vector3 impulse, Vector3 torque, Vector3 point)
+    {
+        EnsurePhysics();
+        if (_carried || _rb == null || _rb.isKinematic)
+            return;
+        _kickUntil = Time.time + 0.55f;
+        _rb.interpolation = RigidbodyInterpolation.Interpolate;
+        _rb.maxDepenetrationVelocity = 1.15f;
+        _rb.WakeUp();
+        _rb.AddForceAtPosition(impulse, point, ForceMode.Impulse);
+        if (torque.sqrMagnitude > 0.0001f)
+            _rb.AddTorque(torque, ForceMode.Impulse);
     }
 
     protected virtual void OnCollisionEnter(Collision collision)
@@ -532,8 +548,8 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
     {
         if (_carried || _rb == null || _rb.isKinematic)
             return;
-        const float maxSpeed = 13f;
-        if (_rb.linearVelocity.sqrMagnitude > maxSpeed * maxSpeed)
+        const float maxSpeed = 16f;
+        if (Time.time >= _kickUntil && _rb.linearVelocity.sqrMagnitude > maxSpeed * maxSpeed)
             _rb.linearVelocity = Vector3.ClampMagnitude(_rb.linearVelocity, maxSpeed);
         if (_rb.angularVelocity.sqrMagnitude > 80f)
             _rb.angularVelocity = Vector3.ClampMagnitude(_rb.angularVelocity, 9f);
@@ -561,6 +577,8 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
 
     bool RestOnLand()
     {
+        if (Time.time < _kickUntil)
+            return false;
         if (_col == null || _rb == null)
             return false;
         Vector3 origin = transform.position + Vector3.up * 0.45f;
@@ -590,15 +608,24 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
         }
         float skin = 0.02f;
         if (bottom < hit.point.y + skin)
-            transform.position += Vector3.up * (hit.point.y + skin - bottom);
-        _rb.linearVelocity = Vector3.zero;
-        _rb.angularVelocity = Vector3.zero;
-        _rb.Sleep();
+        {
+            Vector3 p = _rb.position;
+            p.y += hit.point.y + skin - bottom;
+            _rb.position = p;
+        }
+        if (_rb.linearVelocity.sqrMagnitude < 0.04f && _rb.angularVelocity.sqrMagnitude < 0.2f)
+        {
+            _rb.linearVelocity = Vector3.zero;
+            _rb.angularVelocity = Vector3.zero;
+            _rb.Sleep();
+        }
         return true;
     }
 
     void KeepAboveGround()
     {
+        if (Time.time < _kickUntil)
+            return;
         if (_col == null)
             return;
         float skin = 0.03f;
@@ -627,13 +654,20 @@ public abstract class HeldItem : MonoBehaviour, IInteractable
         float lift = ground.y + skin - bottom;
         if (lift <= 0f)
             return;
-        transform.position += Vector3.up * lift;
-        if (_rb != null && !_rb.isKinematic && _rb.linearVelocity.y < 0f)
+        if (_rb != null && !_rb.isKinematic)
         {
+            Vector3 p = _rb.position;
+            p.y += lift;
+            _rb.MovePosition(p);
             Vector3 v = _rb.linearVelocity;
-            v.y = 0f;
-            _rb.linearVelocity = v;
+            if (v.y < 0f)
+            {
+                v.y = 0f;
+                _rb.linearVelocity = v;
+            }
         }
+        else
+            transform.position += Vector3.up * lift;
     }
 
     bool IsOwnCollider(Collider col)

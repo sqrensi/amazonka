@@ -150,12 +150,19 @@ public class PistolItem : HeldItem
         }
 
         Rigidbody body = hit.rigidbody != null ? hit.rigidbody : hit.collider.attachedRigidbody;
-        if (body == null || body.isKinematic)
-            return;
         if (IsOwnHit(hit.collider))
             return;
 
         Vector3 forceDir = dir.sqrMagnitude > 0.001f ? dir.normalized : hit.normal * -1f;
+        var item = hit.collider.GetComponentInParent<HeldItem>();
+        if (item != null && !item.IsCarried)
+        {
+            Vector3 spin = Vector3.Cross(forceDir, Random.onUnitSphere) * (bulletImpulse * 0.18f);
+            item.KickFromShot(forceDir * bulletImpulse, spin, hit.point);
+            return;
+        }
+        if (body == null || body.isKinematic)
+            return;
         body.AddForceAtPosition(forceDir * bulletImpulse, hit.point, ForceMode.Impulse);
         body.AddTorque(Vector3.Cross(forceDir, Random.onUnitSphere) * (bulletImpulse * 0.18f), ForceMode.Impulse);
     }

@@ -323,6 +323,11 @@ public class BoatPiece : MonoBehaviour, IInteractable
 
     public bool DeckSubmerged()
     {
+        return DeckSubmerged(0.18f);
+    }
+
+    public bool DeckSubmerged(float underMeters)
+    {
         CollectIsland(IslandTmp);
         bool anyHull = false;
         float top = float.NegativeInfinity;
@@ -343,7 +348,7 @@ public class BoatPiece : MonoBehaviour, IInteractable
             return true;
         if (!BoatWater.TryHeight(sample, out float waterY))
             return false;
-        return top < waterY - 0.18f;
+        return top < waterY - Mathf.Max(0.05f, underMeters);
     }
 
     bool IslandAfloat()
@@ -630,7 +635,7 @@ public class BoatPiece : MonoBehaviour, IInteractable
             _rb.linearVelocity = Vector3.zero;
             _rb.angularVelocity = Vector3.zero;
         }
-        _rb.interpolation = RigidbodyInterpolation.None;
+        _rb.interpolation = RigidbodyInterpolation.Interpolate;
         _rb.isKinematic = true;
         _rb.detectCollisions = true;
         _rb.useGravity = false;
@@ -871,9 +876,19 @@ public class BoatPiece : MonoBehaviour, IInteractable
             _rb.maxDepenetrationVelocity = 0.18f;
         }
         if (IslandTmp.Count > 1)
-            _rb.angularVelocity = Vector3.ClampMagnitude(_rb.angularVelocity, 0.85f);
+            _rb.angularVelocity = Vector3.ClampMagnitude(_rb.angularVelocity, 0.42f);
         if (HullSink > 0.01f)
             _rb.AddForce(Vector3.down * (HullSink * _rb.mass * Mathf.Clamp01(frac + 0.15f)), ForceMode.Force);
+        if (HullFlood > 0.2f)
+        {
+            Vector3 v = _rb.linearVelocity;
+            float floor = Mathf.Lerp(-0.28f, -0.55f, Mathf.SmoothStep(0f, 1f, HullFlood));
+            if (v.y < floor)
+            {
+                v.y = Mathf.Lerp(v.y, floor, SimTime.Blend(0.35f, Time.fixedDeltaTime));
+                _rb.linearVelocity = v;
+            }
+        }
         ApplyIslandCurrent(frac);
     }
 
@@ -1405,20 +1420,6 @@ public class BoatPiece : MonoBehaviour, IInteractable
             {
                 if (p.OarIsMounted() && p._oarLatchHull != null)
                     TryAddIsland(p._oarLatchHull);
-            }
-            else
-            {
-                var par = p.transform.parent != null ? p.transform.parent.GetComponent<BoatPiece>() : null;
-                TryAddIsland(par);
-                for (int c = 0; c < p.transform.childCount; c++)
-                {
-                    var child = p.transform.GetChild(c).GetComponent<BoatPiece>();
-                    if (child == null)
-                        continue;
-                    if (child.kind == BoatPieceKind.Oar && !child.OarIsMounted())
-                        continue;
-                    TryAddIsland(child);
-                }
             }
         }
 

@@ -23,6 +23,10 @@ public class SlimeMonster : MonoBehaviour, IDamageable
     Animator _anim;
     Vector3 _home;
     Vector3 _hopVel;
+    Vector3 _hopDir;
+    Vector3 _physPos;
+    Vector3 _physPosPrev;
+    bool _physReady;
     bool _dead;
     bool _hopping;
     string _animState = "";
@@ -38,6 +42,9 @@ public class SlimeMonster : MonoBehaviour, IDamageable
         if (_anim != null)
             _anim.applyRootMotion = false;
         _home = transform.position;
+        _physPos = transform.position;
+        _physPosPrev = _physPos;
+        _physReady = true;
     }
 
     void OnEnable()
@@ -99,15 +106,38 @@ public class SlimeMonster : MonoBehaviour, IDamageable
 
     void Update()
     {
-        if (_dead || _cc == null || !_cc.enabled || _hopping)
+        if (_dead || !_physReady)
             return;
-        float dt = Time.deltaTime;
-        if (_cc.isGrounded && _hopVel.y < 0f)
-            _hopVel.y = -2f;
-        _hopVel.x = 0f;
-        _hopVel.z = 0f;
-        _hopVel.y += gravity * dt;
-        _cc.Move(_hopVel * dt);
+        transform.position = Vector3.Lerp(_physPosPrev, _physPos, SimTime.VisualAlpha());
+    }
+
+    void LateUpdate()
+    {
+        if (_dead || !_physReady)
+            return;
+        transform.position = Vector3.Lerp(_physPosPrev, _physPos, SimTime.VisualAlpha());
+    }
+
+    void FixedUpdate()
+    {
+        if (_dead || _cc == null || !_cc.enabled)
+            return;
+        transform.position = _physPos;
+        float dt = Time.fixedDeltaTime;
+        if (_hopping)
+            TickHop(_hopDir, dt);
+        else
+        {
+            if (_cc.isGrounded && _hopVel.y < 0f)
+                _hopVel.y = -2f;
+            _hopVel.x = 0f;
+            _hopVel.z = 0f;
+            _hopVel.y += gravity * dt;
+            _cc.Move(_hopVel * dt);
+        }
+        _physPosPrev = _physPos;
+        _physPos = transform.position;
+        _physReady = true;
     }
 
     IEnumerator Despawn()
@@ -164,6 +194,10 @@ public class SlimeMonster : MonoBehaviour, IDamageable
 
     IEnumerator HopTo(Vector3 dest)
     {
+        Vector3 start = dest - transform.position;
+        start.y = 0f;
+        if (start.sqrMagnitude > 0.01f)
+            _hopDir = start.normalized;
         _hopping = true;
         PlayAnim("WalkFWD", 0.12f);
         float giveUp = 6.5f;
@@ -176,7 +210,7 @@ public class SlimeMonster : MonoBehaviour, IDamageable
                 break;
 
             Face(dest, Time.deltaTime);
-            TickHop(flat.normalized, Time.deltaTime);
+            _hopDir = flat.normalized;
             elapsed += Time.deltaTime;
             yield return null;
         }

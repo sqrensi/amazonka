@@ -76,6 +76,21 @@ public static class BoatPaddle
         rb.AddTorque(Vector3.up * yawAccel, ForceMode.Acceleration);
     }
 
+    public static void CalmRock(BoatPiece any, float k)
+    {
+        if (any == null || k <= 0f)
+            return;
+        Rigidbody rb = any.IslandRootBody();
+        if (rb == null || rb.isKinematic)
+            return;
+        Vector3 w = rb.angularVelocity;
+        Vector3 yaw = Vector3.Project(w, Vector3.up);
+        Vector3 rock = w - yaw;
+        rb.AddTorque(-rock * k, ForceMode.Acceleration);
+        if (rock.sqrMagnitude > 0.08f)
+            rb.angularVelocity = yaw + rock * 0.82f;
+    }
+
     public static void DampIslandYaw(BoatPiece any, float k)
     {
         if (any == null || k <= 0f)

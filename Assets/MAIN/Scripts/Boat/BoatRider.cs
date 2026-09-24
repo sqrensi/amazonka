@@ -81,11 +81,17 @@ public class BoatRider : MonoBehaviour
 
         if (_move == null)
             return;
+        transform.localPosition = _localSeat;
+    }
+
+    void FixedUpdate()
+    {
+        if (_boat == null || _move == null)
+            return;
         Vector2 input = _move.MoveInput;
         Vector3 force = _boat.transform.forward * input.y * 14f + _boat.transform.right * input.x * 7f;
         _boat.AddForce(force, ForceMode.Acceleration);
         _boat.AddTorque(_boat.transform.up * input.x * 2.4f, ForceMode.Acceleration);
-        transform.localPosition = _localSeat;
     }
 
     static bool KeyboardJump()

@@ -248,7 +248,10 @@ public class BoatRaceMode : MonoBehaviour
         }
         BoatWater.CurrentEnabled = true;
         if (_player != null)
+        {
             _player.MovementLocked = false;
+            _player.ArmLaunchSeat(2.6f);
+        }
         yield return _hud.PlayLaunchIn();
     }
 
@@ -312,7 +315,7 @@ public class BoatRaceMode : MonoBehaviour
 
         bool inWater = PlayerInWater();
         bool sunk = CraftFullySunk(_craft);
-        if (sunk && inWater)
+        if (sunk && inWater && !onBoat)
         {
             if (_sunkSince < 0f)
                 _sunkSince = Time.unscaledTime;
@@ -331,9 +334,15 @@ public class BoatRaceMode : MonoBehaviour
             return;
         }
 
+        bool jumpGrace = _player != null && _player.AirborneNow && !inWater && !_player.IsSwimming;
+        if (jumpGrace)
+        {
+            _offBoatSince = -1f;
+            return;
+        }
+
         if (Time.unscaledTime < _spawnProtectUntil)
         {
-            PlacePlayerOnCraft(_craft);
             _offBoatSince = -1f;
             return;
         }
@@ -354,8 +363,6 @@ public class BoatRaceMode : MonoBehaviour
             return;
         if (!OnBoat())
             return;
-        if (BoatHull.HullBodyCount(_craft) < 2)
-            return;
         Win(Mathf.Max(0f, _endsAt - Time.unscaledTime));
     }
 
@@ -372,21 +379,34 @@ public class BoatRaceMode : MonoBehaviour
         int dryPts = Mathf.RoundToInt((1f - flood) * 180f);
         int piecePts = pieces * 12;
         int arrival = 500;
-        _score = arrival + timePts + hullPts + dryPts + piecePts;
-        _won = true;
-        EndRound(
-            true,
-            "You made the mark",
-            new[]
+        int stylePts = KillStyle.RoundPoints;
+        _score = arrival + timePts + hullPts + dryPts + piecePts + stylePts;
+        var lines = new List<string>
+        {
+            "Arrival                +500",
+            $"Time left              +{timePts}",
+            $"Hull                   +{hullPts}",
+            $"Dry hold               +{dryPts}",
+            $"Pieces                 +{piecePts}"
+        };
+        if (stylePts > 0)
+        {
+            lines.Add($"Shark style            +{stylePts}");
+            var seen = new Dictionary<string, int>();
+            for (int i = 0; i < KillStyle.RoundTags.Count; i++)
             {
-                "Arrival                +500",
-                $"Time left              +{timePts}",
-                $"Hull                   +{hullPts}",
-                $"Dry hold               +{dryPts}",
-                $"Pieces                 +{piecePts}",
-                "",
-                $"Water time             {Fmt(elapsed)}"
-            });
+                var tag = KillStyle.RoundTags[i];
+                if (!seen.ContainsKey(tag.name))
+                    seen[tag.name] = 0;
+                seen[tag.name]++;
+            }
+            foreach (var kv in seen)
+                lines.Add($"  {kv.Key}  x{kv.Value}");
+        }
+        lines.Add("");
+        lines.Add($"Water time             {Fmt(elapsed)}");
+        _won = true;
+        EndRound(true, "You made the mark", lines.ToArray());
     }
 
     void Fail(string reason)
@@ -516,8 +536,6 @@ public class BoatRaceMode : MonoBehaviour
         if (finish == null || _player == null)
             return false;
         if (!OnBoat())
-            return false;
-        if (BoatHull.HullBodyCount(_craft) < 2)
             return false;
         return DistanceToFinish() <= finishRadius;
     }

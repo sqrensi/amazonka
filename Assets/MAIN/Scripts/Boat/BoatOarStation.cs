@@ -15,6 +15,12 @@ public class BoatOarStation : MonoBehaviour
     Rigidbody _boundRoot;
     float _stroke;
     float _pitch;
+    float _pitchVel;
+    float _steerShow;
+    float _steerVel;
+    float _rootCheckAt;
+    float _rideRetryAt;
+    float _drivePush;
     Transform[] _parts;
     Vector3[] _restPos;
     Quaternion[] _restRot;
@@ -136,6 +142,9 @@ public class BoatOarStation : MonoBehaviour
     void ResetStroke()
     {
         _pitch = 0f;
+        _pitchVel = 0f;
+        _steerShow = 0f;
+        _steerVel = 0f;
         ApplyStroke(0f, 0f);
     }
 
@@ -181,24 +190,28 @@ public class BoatOarStation : MonoBehaviour
             return;
         }
 
-        var hull = _oar.IslandLeader() ?? _oar;
-        var root = hull.IslandRootBody();
-        if (_move != null && root != null && root != _boundRoot)
-        {
-            _boundRoot = root;
-            _move.BindBoatFollow(hull);
-        }
+        KeepRideOnHull();
 
         Vector2 input = _move != null ? _move.MoveInput : Vector2.zero;
-        BoatPaddle.TickSteer(Time.deltaTime, input.x);
         bool drive = Mathf.Abs(input.y) > 0.08f;
+        float tick = Time.smoothDeltaTime;
+        if (tick < 0.00005f)
+            tick = Time.unscaledDeltaTime;
+        BoatPaddle.TickSteer(tick, input.x);
         if (drive)
-            _stroke += Time.deltaTime * 11.2f;
+            _stroke += tick * 11.2f;
         else
-            _stroke = Mathf.MoveTowards(_stroke, 0f, Time.deltaTime * 4f);
+            _stroke = Mathf.MoveTowards(_stroke, 0f, tick * 4f);
         float targetPitch = drive ? Mathf.Sin(_stroke) * 11f * Mathf.Sign(input.y) : 0f;
-        _pitch = Mathf.Lerp(_pitch, targetPitch, 1f - Mathf.Exp(-8f * Time.deltaTime));
-        ApplyStroke(_pitch, BoatPaddle.Steer * 0.4f);
+        _pitch = Mathf.SmoothDamp(_pitch, targetPitch, ref _pitchVel, 0.05f, Mathf.Infinity, tick);
+        _steerShow = Mathf.SmoothDamp(_steerShow, BoatPaddle.Steer * 0.4f, ref _steerVel, 0.06f, Mathf.Infinity, tick);
+    }
+
+    void LateUpdate()
+    {
+        if (_oar == null)
+            return;
+        ApplyStroke(_pitch, _steerShow);
     }
 
     bool HullGoingUnder()
@@ -206,7 +219,35 @@ public class BoatOarStation : MonoBehaviour
         var lead = _oar != null ? _oar.IslandLeader() ?? _oar : null;
         if (lead == null)
             return false;
-        return lead.HullFlood >= 0.88f || lead.DeckSubmerged();
+        return lead.HullFlood >= 0.97f || lead.DeckSubmerged(0.7f);
+    }
+
+    void KeepRideOnHull()
+    {
+        if (_move == null || _oar == null)
+            return;
+        if (_move.IsOnCraft && Time.unscaledTime < _rootCheckAt)
+            return;
+        _rootCheckAt = Time.unscaledTime + 0.4f;
+        var hull = _oar.IslandLeader() ?? _oar;
+        if (hull == null)
+            return;
+        var root = hull.IslandRootBody() ?? hull.Body;
+        if (_move.IsOnCraft)
+        {
+            if (root != null && root != _boundRoot)
+            {
+                _boundRoot = root;
+                _move.RetargetBoatFollow(hull);
+            }
+            return;
+        }
+        if (Time.unscaledTime < _rideRetryAt)
+            return;
+        _rideRetryAt = Time.unscaledTime + 0.25f;
+        _move.BindBoatFollow(hull);
+        if (root != null)
+            _boundRoot = root;
     }
 
     BoatPiece StandPiece()
@@ -240,16 +281,19 @@ public class BoatOarStation : MonoBehaviour
         bool steer = Mathf.Abs(input.x) > 0.08f;
 
         var hull = _oar.IslandLeader() ?? _oar;
+        BoatPaddle.CalmRock(hull, drive ? 7.5f : 4.2f);
         if (drive && !steer)
-            BoatPaddle.DampIslandYaw(hull, 6.5f);
+            BoatPaddle.DampIslandYaw(hull, 7.2f);
         if (steer)
-            BoatPaddle.YawIsland(hull, input.x * 5.4f);
-        if (!drive)
+            BoatPaddle.YawIsland(hull, input.x * 4.6f);
+        float want = drive ? input.y * 7.6f : 0f;
+        _drivePush = Mathf.MoveTowards(_drivePush, want, (drive ? 14f : 22f) * Time.fixedDeltaTime);
+        if (Mathf.Abs(_drivePush) < 0.04f)
             return;
         Vector3 fwd = hull.CraftForward();
         if (fwd.sqrMagnitude < 0.0001f)
             return;
-        float pulse = 0.72f + 0.28f * Mathf.Abs(Mathf.Sin(_stroke));
-        BoatPaddle.PushIsland(hull, fwd * (input.y * 9f * pulse), ForceMode.Acceleration);
+        float pulse = 0.9f + 0.1f * Mathf.Abs(Mathf.Sin(_stroke));
+        BoatPaddle.PushIsland(hull, fwd * (_drivePush * pulse), ForceMode.Acceleration);
     }
 }

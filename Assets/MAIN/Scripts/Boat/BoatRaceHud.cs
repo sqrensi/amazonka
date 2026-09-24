@@ -140,10 +140,10 @@ public class BoatRaceHud : MonoBehaviour
 
         var stack = new GameObject("Stack", typeof(RectTransform)).GetComponent<RectTransform>();
         stack.SetParent(_resultGroup.transform, false);
-        Pin(stack, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(900f, 560f));
+        Pin(stack, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(920f, 780f));
         var layout = stack.gameObject.AddComponent<VerticalLayoutGroup>();
-        layout.spacing = 18f;
-        layout.padding = new RectOffset(24, 24, 24, 24);
+        layout.spacing = 14f;
+        layout.padding = new RectOffset(24, 24, 16, 28);
         layout.childAlignment = TextAnchor.MiddleCenter;
         layout.childControlWidth = true;
         layout.childControlHeight = true;
@@ -163,11 +163,14 @@ public class BoatRaceHud : MonoBehaviour
         _resultBody = FishText(stack, "Body", 20, White, FontStyle.Normal, TextAnchor.UpperCenter);
         _resultBody.horizontalOverflow = HorizontalWrapMode.Wrap;
         _resultBody.verticalOverflow = VerticalWrapMode.Overflow;
-        _resultBody.lineSpacing = 1.2f;
-        Row(_resultBody, 200f);
+        _resultBody.lineSpacing = 1.12f;
+        var bodyRow = _resultBody.gameObject.AddComponent<LayoutElement>();
+        bodyRow.minHeight = 80f;
+        bodyRow.preferredHeight = 220f;
+        bodyRow.flexibleHeight = 0f;
 
         _resultHint = FishText(stack, "Hint", 18, Gold, FontStyle.Normal, TextAnchor.MiddleCenter);
-        Row(_resultHint, 32f);
+        Row(_resultHint, 40f);
     }
 
     public IEnumerator PlayIntro()
@@ -237,6 +240,15 @@ public class BoatRaceHud : MonoBehaviour
                 body += lines[i] + "\n";
         }
         _resultBody.text = body.TrimEnd();
+        var bodyFit = _resultBody.GetComponent<LayoutElement>();
+        if (bodyFit != null)
+        {
+            int n = 1;
+            if (lines != null)
+                n = Mathf.Max(1, lines.Length);
+            bodyFit.preferredHeight = Mathf.Clamp(28f * n + 12f, 80f, 420f);
+            bodyFit.minHeight = bodyFit.preferredHeight;
+        }
         _resultHint.text = $"Press  {restart}  to run it again";
 
         _resultGroup.gameObject.SetActive(true);

@@ -70,8 +70,13 @@ public class RiverShark : MonoBehaviour, IDamageable
     float _lungeUntil;
     Vector3 _aimSmooth;
     Vector3 _aimDamp;
+    Vector3 _simPosVel;
     float _yawRate;
+    float _bank;
     float _stuckTime;
+    Vector3 _simPos;
+    Quaternion _simRot = Quaternion.identity;
+    bool _simReady;
     static readonly RaycastHit[] SweepHits = new RaycastHit[16];
     static readonly Collider[] OverlapBuf = new Collider[16];
 
@@ -122,7 +127,7 @@ public class RiverShark : MonoBehaviour, IDamageable
         shark.Build();
         shark._rising = true;
         shark.RollMood();
-        shark._speed = 28f * shark._kindSpeed;
+        shark._speed = 7.2f * shark._kindSpeed;
         return shark;
     }
 
@@ -139,21 +144,21 @@ public class RiverShark : MonoBehaviour, IDamageable
         switch (kind)
         {
             case Kind.Bull:
-                _kindSpeed = 1.12f;
+                _kindSpeed = 1.06f;
                 _kindTurn = 1.18f;
                 _kindPeel = 0.55f;
                 _maxHp = 190f;
-                moveSpeed = 20.4f;
+                moveSpeed = 7.1f;
                 biteRange = 3.05f;
                 retreatSeconds = 2.1f;
                 retreatDistance = 7.5f;
                 break;
             case Kind.Runner:
-                _kindSpeed = 1.32f;
+                _kindSpeed = 1.12f;
                 _kindTurn = 0.92f;
                 _kindPeel = 0.7f;
                 _maxHp = 125f;
-                moveSpeed = 23.5f;
+                moveSpeed = 7.6f;
                 biteRange = 2.75f;
                 retreatSeconds = 2.8f;
                 retreatDistance = 10f;
@@ -163,7 +168,7 @@ public class RiverShark : MonoBehaviour, IDamageable
                 _kindTurn = 1.28f;
                 _kindPeel = 1f;
                 _maxHp = 160f;
-                moveSpeed = 18.8f;
+                moveSpeed = 6.6f;
                 biteRange = 2.9f;
                 retreatSeconds = 3.8f;
                 retreatDistance = 12f;
@@ -208,7 +213,12 @@ public class RiverShark : MonoBehaviour, IDamageable
         _rends = GetComponentsInChildren<Renderer>();
         _baseColors = new Color[_rends.Length];
         for (int i = 0; i < _rends.Length; i++)
-            _baseColors[i] = _rends[i] != null ? _rends[i].material.color : Color.white;
+        {
+            if (_rends[i] == null)
+                continue;
+            ForceOpaque(_rends[i]);
+            _baseColors[i] = ReadTint(_rends[i]);
+        }
     }
 
     static void StripBodies(GameObject root)
@@ -467,41 +477,57 @@ public class RiverShark : MonoBehaviour, IDamageable
 
     void Update()
     {
-        if (_dead)
-        {
-            _sink += Time.deltaTime;
-            transform.position += Vector3.down * (1.4f * Time.deltaTime);
-            transform.Rotate(80f * Time.deltaTime, 0f, 20f * Time.deltaTime, Space.Self);
-            Fade(_sink / 3.2f);
-            if (_sink > 3.4f)
-                Destroy(gameObject);
+        if (!_dead)
             return;
+        _simReady = false;
+        _sink += Time.deltaTime;
+        transform.position += Vector3.down * (0.38f * Time.deltaTime);
+        transform.Rotate(22f * Time.deltaTime, 0f, 8f * Time.deltaTime, Space.Self);
+        Fade(Mathf.InverseLerp(8f, 14.5f, _sink));
+        float s = Mathf.Lerp(1f, 0.82f, Mathf.InverseLerp(6f, 14f, _sink));
+        transform.localScale = Vector3.one * s;
+        if (_sink > 14.5f)
+            Destroy(gameObject);
+    }
+
+    void FixedUpdate()
+    {
+        if (_dead || !RaceSim.HasAuthority)
+            return;
+
+        if (!_simReady)
+        {
+            _simPos = _rb != null ? _rb.position : transform.position;
+            _simRot = _rb != null ? _rb.rotation : transform.rotation;
+            _simReady = true;
         }
 
-        if (!RaceSim.HasAuthority)
-            return;
+        Vector3 pos = _simPos;
+        Quaternion rot = _simRot;
+        Vector3 fwd = rot * Vector3.forward;
+        Vector3 right = rot * Vector3.right;
 
-        var prey = RaceRoster.Find(_targetId) ?? RaceRoster.PreyNear(transform.position);
+        var prey = RaceRoster.Find(_targetId) ?? RaceRoster.PreyNear(pos);
         if (prey != null)
             _targetId = prey.Id;
         if (prey == null)
             return;
 
         Vector3 chase = prey.Craft != null ? prey.Craft.transform.position : prey.transform.position;
-        Vector3 flow = BoatWater.CurrentAt(transform.position);
+        Vector3 flow = BoatWater.CurrentAt(pos);
         flow.y = 0f;
         Vector3 carry = PreyCarry(prey, flow);
-        float dt = Time.deltaTime;
+        float dt = Time.fixedDeltaTime;
         _rage = Mathf.MoveTowards(_rage, 0f, dt * 0.085f);
 
         bool blinded = Time.time < _blindUntil;
-        float range = Planar(chase, transform.position);
-        Vector3 toBoat = chase - transform.position;
+        float range = Planar(chase, pos);
+        Vector3 toBoat = chase - pos;
         toBoat.y = 0f;
-        Vector3 boatDir = toBoat.sqrMagnitude > 0.01f ? toBoat.normalized : transform.forward;
+        Vector3 boatDir = toBoat.sqrMagnitude > 0.01f ? toBoat.normalized : fwd;
         Vector3 side = Vector3.Cross(Vector3.up, boatDir);
         if (side.sqrMagnitude < 0.01f)
-            side = transform.right;
+            side = right;
         side.Normalize();
         if (_mood == 1)
             side = -side;
@@ -511,38 +537,38 @@ public class RiverShark : MonoBehaviour, IDamageable
         if (blinded)
         {
             if (_stunDir.sqrMagnitude < 0.01f)
-                _stunDir = transform.forward;
+                _stunDir = fwd;
             _stunDir = Vector3.Slerp(_stunDir, Quaternion.Euler(0f, Mathf.Sin(Time.time * 0.55f) * 28f, 0f) * _stunDir, dt * 0.9f);
             _stunDir.y = 0f;
             if (_stunDir.sqrMagnitude < 0.01f)
-                _stunDir = transform.right;
+                _stunDir = right;
             _stunDir.Normalize();
-            aim = transform.position + _stunDir * 12f;
-            burst = Cruise() * 0.72f;
+            aim = pos + _stunDir * 12f;
+            burst = CatchSpeed(carry, range, 0.72f);
         }
         else if (_pass == Pass.Ambush)
         {
             Vector3 flowDir = carry.sqrMagnitude > 0.2f ? carry.normalized : boatDir;
-            float boatAlong = Vector3.Dot(chase - transform.position, flowDir);
+            float boatAlong = Vector3.Dot(chase - pos, flowDir);
             if (range < 24f || boatAlong > 6f || _rage > 0.25f)
             {
                 _pass = Pass.Lunge;
                 _lungeUntil = RaceSim.RaceElapsed + Random.Range(1.2f, 2.1f);
             }
             Vector3 home = _peelPoint;
-            home.y = transform.position.y;
+            home.y = pos.y;
             Vector3 patrol = home + side * (Mathf.Sin(Time.time * 0.32f + _jukePhase) * 3.2f);
             aim = patrol;
-            burst = 6.5f + carry.magnitude;
+            burst = CatchSpeed(carry, range, 0.55f);
         }
         else if (_pass == Pass.Peel)
         {
             if (RaceSim.RaceElapsed >= _peelUntil || _rage > 0.7f)
                 _pass = _kind == Kind.Stalker ? Pass.Circle : Pass.Hunt;
-            float hold = Planar(_peelPoint, transform.position);
+            float hold = Planar(_peelPoint, pos);
             if (hold < 2.4f || range > 22f)
             {
-                aim = Intercept(chase, carry, transform.position);
+                aim = Intercept(chase, carry, pos);
                 burst = CatchSpeed(carry, range, 0.9f);
             }
             else
@@ -567,13 +593,13 @@ public class RiverShark : MonoBehaviour, IDamageable
         {
             if (RaceSim.RaceElapsed >= _lungeUntil && range > biteRange + 1.2f)
                 _pass = Pass.Hunt;
-            aim = Intercept(chase, carry, transform.position);
+            aim = Intercept(chase, carry, pos);
             burst = CatchSpeed(carry, range, 1.22f + _rage * 0.28f);
         }
         else
         {
             float weave = Mathf.Sin(Time.time * _jukeHz + _jukePhase) * _jukeAmp * (0.45f + (1f - _rage) * 0.55f);
-            aim = Intercept(chase, carry, transform.position) + side * weave;
+            aim = Intercept(chase, carry, pos) + side * weave;
             burst = CatchSpeed(carry, range, 1f + _rage * 0.22f);
             if (range < 14f && Vector3.Dot(_heading, boatDir) > 0.62f && Random.value < dt * 0.55f)
             {
@@ -593,7 +619,7 @@ public class RiverShark : MonoBehaviour, IDamageable
         }
 
         if (!Finite(aim))
-            aim = transform.position + FlatDir(_heading, transform.forward) * 8f;
+            aim = pos + FlatDir(_heading, fwd) * 8f;
         if (!Finite(_aimSmooth) || _aimSmooth.sqrMagnitude < 0.01f)
             _aimSmooth = aim;
         if (!Finite(_aimDamp))
@@ -602,19 +628,28 @@ public class RiverShark : MonoBehaviour, IDamageable
         if (!Finite(_aimSmooth))
             _aimSmooth = aim;
 
-        Vector3 to = _aimSmooth - transform.position;
+        Vector3 to = _aimSmooth - pos;
         to.y = 0f;
         float dist = to.magnitude;
-        Vector3 wishDir = dist > 0.08f && Finite(to) ? to / dist : FlatDir(_heading, transform.forward);
+        Vector3 wishDir = dist > 0.08f && Finite(to) ? to / dist : FlatDir(_heading, fwd);
         wishDir.y = 0f;
-        wishDir = FlatDir(wishDir, transform.forward);
-        Vector3 peer = AvoidPeers(transform.position);
+        wishDir = FlatDir(wishDir, fwd);
+        Vector3 peer = AvoidPeers(pos);
         peer.y = 0f;
         if (peer.sqrMagnitude > 0.04f && Finite(peer))
             wishDir = FlatDir(wishDir + peer.normalized * Mathf.Clamp01(peer.magnitude * 0.07f), wishDir);
 
+        if (BoatCurrentPath.TryCenter(pos, out Vector3 mid, out _))
+        {
+            Vector3 home = mid - pos;
+            home.y = 0f;
+            float off = home.magnitude;
+            if (off > 3.4f && Finite(home))
+                wishDir = FlatDir(wishDir + home.normalized * 0.22f, wishDir);
+        }
+
         Vector3 feelFwd = FlatDir(_heading, wishDir);
-        Vector3 felt = FeelObstacles(transform.position, feelFwd, range);
+        Vector3 felt = FeelObstacles(pos, feelFwd, range);
         if (!Finite(felt))
             felt = Vector3.zero;
         _avoid = Vector3.Lerp(_avoid, felt, 1f - Mathf.Exp(-3.1f * dt));
@@ -633,21 +668,21 @@ public class RiverShark : MonoBehaviour, IDamageable
         _smoothCarry = Vector3.Lerp(_smoothCarry, carry, 1f - Mathf.Exp(-2.6f * dt));
         if (_heading.sqrMagnitude < 0.01f || !Finite(_heading))
             _heading = wishDir;
-        float turn = (2.35f * _kindTurn) * Mathf.Lerp(1.15f, 0.82f, Mathf.Clamp01(_speed / 28f));
-        turn *= 1f + _rage * 0.35f;
+        float turn = (1.55f * _kindTurn) * Mathf.Lerp(1.1f, 0.78f, Mathf.Clamp01(_speed / 14f));
+        turn *= 1f + _rage * 0.22f;
         Vector3 prevHead = _heading;
         _heading = Vector3.RotateTowards(_heading, wishDir, turn * dt, 0f);
         _heading.y = 0f;
-        _heading = FlatDir(_heading, wishDir);
+        _heading = FlatDir(_heading, prevHead);
         float signed = Vector3.SignedAngle(prevHead, _heading, Vector3.up) / Mathf.Max(dt, 0.0001f);
-        _yawRate = Mathf.Lerp(_yawRate, signed, 1f - Mathf.Exp(-8f * dt));
+        _yawRate = Mathf.Lerp(_yawRate, signed, 1f - Mathf.Exp(-5.5f * dt));
 
-        float accel = range > 16f ? 22f : 12.5f;
-        accel *= 1f + _rage * 0.4f;
+        float accel = range > 16f ? 7.2f : 4.4f;
+        accel *= 1f + _rage * 0.25f;
         _speed = Mathf.MoveTowards(_speed, wishSpeed, accel * dt);
-        _smoothVel = _heading * _speed + _smoothCarry * 0.92f;
+        _smoothVel = _heading * _speed;
 
-        Vector3 from = transform.position;
+        Vector3 from = pos;
         float surfY = from.y;
         if (BoatWater.TryHeight(from + _smoothVel * dt, out float waterY))
             surfY = waterY - 0.2f;
@@ -656,20 +691,24 @@ public class RiverShark : MonoBehaviour, IDamageable
         planarStep.y = 0f;
         Vector3 next = Glide(from, from + planarStep);
         next.y = Mathf.MoveTowards(from.y, surfY, (_rising ? 6.4f : 2.8f) * dt);
-        next = NudgeOut(next);
-        next = SharkDirector.StayInRiver(next, Mathf.Clamp(_speed * dt, 0.05f, 0.22f));
+        next = NudgeOut(next, dt);
+        next = SharkDirector.StayInRiver(next, Mathf.Clamp(_speed * dt, 0.02f, 0.065f));
         if (!Finite(next))
         {
             _smoothVel = Vector3.zero;
             _aimDamp = Vector3.zero;
             _avoid = Vector3.zero;
-            _heading = FlatDir(transform.forward, Vector3.forward);
+            _heading = FlatDir(fwd, Vector3.forward);
             return;
         }
-        if (_rb != null)
-            _rb.MovePosition(next);
-        else
-            transform.position = next;
+        Vector3 moved = next - from;
+        moved.y = 0f;
+        if (moved.sqrMagnitude > 0.00012f)
+        {
+            Vector3 along = moved.normalized;
+            _heading = Vector3.RotateTowards(_heading, along, turn * dt * 0.85f, 0f);
+            _heading = FlatDir(_heading, along);
+        }
         float slid = Planar(from, next);
         if (range > 9f && slid < 0.07f && (_avoid.sqrMagnitude > 0.04f || _pass == Pass.Ambush))
             _stuckTime += dt;
@@ -677,29 +716,36 @@ public class RiverShark : MonoBehaviour, IDamageable
             _stuckTime = Mathf.Max(0f, _stuckTime - dt * 1.6f);
         if (_stuckTime > 0.55f)
         {
-            UnstickTowardChannel(chase);
+            UnstickTowardChannel(chase, from);
             if (_stuckTime > 1.4f)
                 _stuckTime = 0.4f;
         }
         if (_heading.sqrMagnitude > 0.04f && Finite(_heading))
         {
-            float bank = Mathf.Clamp(-_yawRate * 0.085f, -18f, 18f);
-            Quaternion want = Quaternion.LookRotation(_heading, Vector3.up) * Quaternion.Euler(0f, 0f, bank);
-            transform.rotation = Quaternion.Slerp(transform.rotation, want, 1f - Mathf.Exp(-5.4f * dt));
+            float wantBank = Mathf.Clamp(-_yawRate * 0.05f, -9f, 9f);
+            _bank = Mathf.Lerp(_bank, wantBank, 1f - Mathf.Exp(-6f * dt));
+            Quaternion want = Quaternion.LookRotation(_heading, Vector3.up) * Quaternion.Euler(0f, 0f, _bank);
+            rot = Quaternion.Slerp(rot, want, 1f - Mathf.Exp(-3.8f * dt));
         }
 
-        float biteDist = Planar(chase, transform.position);
+        if (!Finite(_simPosVel))
+            _simPosVel = Vector3.zero;
+        _simPos = Vector3.SmoothDamp(_simPos, next, ref _simPosVel, 0.055f, 16f, dt);
+        _simRot = rot;
+        ApplySimPose();
+
+        float biteDist = Planar(chase, from);
         if (biteDist < 52f)
             _engaged = true;
 
         if (!_rising && !blinded && _pass != Pass.Peel && biteDist <= biteRange
-            && SharkDirector.CanStrikeFrom(transform.position))
+            && SharkDirector.CanStrikeFrom(from))
         {
             Bite(prey, chase);
-            Vector3 away = transform.position - chase;
+            Vector3 away = from - chase;
             away.y = 0f;
             if (away.sqrMagnitude < 0.04f)
-                away = -transform.forward;
+                away = -fwd;
             away.Normalize();
             Vector3 peelSide = Vector3.Cross(Vector3.up, away);
             if (Random.value > 0.5f)
@@ -716,9 +762,19 @@ public class RiverShark : MonoBehaviour, IDamageable
         }
     }
 
-    void UnstickTowardChannel(Vector3 chase)
+    void ApplySimPose()
     {
-        Vector3 here = transform.position;
+        if (_rb != null)
+        {
+            _rb.MovePosition(_simPos);
+            _rb.MoveRotation(_simRot);
+        }
+        else
+            transform.SetPositionAndRotation(_simPos, _simRot);
+    }
+
+    void UnstickTowardChannel(Vector3 chase, Vector3 here)
+    {
         if (!BoatCurrentPath.TryAhead(here, 4f, 0f, out Vector3 open, out Vector3 tan)
             && !BoatCurrentPath.TryCenter(here, out open, out tan))
             open = chase;
@@ -730,7 +786,7 @@ public class RiverShark : MonoBehaviour, IDamageable
         if (pull.sqrMagnitude < 0.01f)
             return;
         pull.Normalize();
-        _heading = Vector3.Slerp(_heading, pull, 0.12f);
+        _heading = Vector3.Slerp(_heading, pull, SimTime.Blend(0.12f, Time.fixedDeltaTime));
         _heading.y = 0f;
         if (_heading.sqrMagnitude > 0.01f)
             _heading.Normalize();
@@ -758,12 +814,11 @@ public class RiverShark : MonoBehaviour, IDamageable
     {
         boatVel.y = 0f;
         float boat = boatVel.magnitude;
-        float extra = Mathf.Lerp(6.4f, 16.5f, Mathf.InverseLerp(6f, 40f, range));
-        extra *= _kindSpeed;
-        extra += _rage * 4.5f;
+        float extra = 1.35f * _kindSpeed;
+        extra += _rage * 0.4f;
         if (_pass == Pass.Lunge)
-            extra += 3.8f;
-        drive = Mathf.Clamp(drive, 0.72f, 1.45f);
+            extra += 0.55f;
+        drive = Mathf.Clamp(drive, 0.85f, 1.12f);
         return boat + extra * drive;
     }
 
@@ -776,8 +831,8 @@ public class RiverShark : MonoBehaviour, IDamageable
         if (dist < 0.2f)
             return chase;
         Vector3 toward = rel / dist;
-        float closing = 12f - Vector3.Dot(boatVel, toward);
-        float t = dist / Mathf.Max(6f, closing);
+        float closing = 2.4f - Vector3.Dot(boatVel, toward);
+        float t = dist / Mathf.Max(2.2f, closing);
         t = Mathf.Clamp(t, 0.2f, 1.85f);
         Vector3 lead = chase + boatVel * t;
         lead.y = chase.y;
@@ -869,7 +924,7 @@ public class RiverShark : MonoBehaviour, IDamageable
         if (!hit)
             return from + delta;
         nrm.Normalize();
-        _avoid = Vector3.Lerp(_avoid, nrm, 0.08f);
+        _avoid = Vector3.Lerp(_avoid, nrm, SimTime.Blend(0.08f, Time.fixedDeltaTime));
         Vector3 along = Vector3.ProjectOnPlane(delta, nrm);
         if (along.sqrMagnitude < 0.000001f)
             along = Vector3.Cross(Vector3.up, nrm) * dist * 0.35f;
@@ -895,7 +950,7 @@ public class RiverShark : MonoBehaviour, IDamageable
         return from + alongDir * go;
     }
 
-    Vector3 NudgeOut(Vector3 pos)
+    Vector3 NudgeOut(Vector3 pos, float dt)
     {
         const float r = 0.32f;
         int n = Physics.OverlapSphereNonAlloc(pos, r, OverlapBuf, SolidMask(), QueryTriggerInteraction.Ignore);
@@ -921,10 +976,10 @@ public class RiverShark : MonoBehaviour, IDamageable
         }
         if (push.sqrMagnitude < 0.0001f)
             return pos;
-        float max = 0.7f * Time.deltaTime;
+        float max = 0.7f * dt;
         if (push.magnitude > max)
             push = push.normalized * max;
-        _avoid = Vector3.Lerp(_avoid, push.normalized, 0.12f);
+        _avoid = Vector3.Lerp(_avoid, push.normalized, SimTime.Blend(0.12f, dt));
         return pos + push;
     }
 
@@ -1059,14 +1114,67 @@ public class RiverShark : MonoBehaviour, IDamageable
         return best;
     }
 
+    static Color ReadTint(Renderer r)
+    {
+        if (r == null)
+            return Color.white;
+        var mat = r.sharedMaterial;
+        if (mat == null)
+            return Color.white;
+        if (mat.HasProperty("_BaseColor"))
+            return mat.GetColor("_BaseColor");
+        if (mat.HasProperty("_Color"))
+            return mat.GetColor("_Color");
+        return mat.color;
+    }
+
+    static void WriteTint(Renderer r, Color c)
+    {
+        if (r == null)
+            return;
+        var mat = r.material;
+        c.a = 1f;
+        if (mat.HasProperty("_BaseColor"))
+            mat.SetColor("_BaseColor", c);
+        if (mat.HasProperty("_Color"))
+            mat.SetColor("_Color", c);
+        mat.color = c;
+    }
+
+    static void ForceOpaque(Renderer r)
+    {
+        if (r == null)
+            return;
+        var mat = r.material;
+        mat.SetFloat("_Surface", 0f);
+        mat.SetOverrideTag("RenderType", "Opaque");
+        mat.SetInt("_ZWrite", 1);
+        mat.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        mat.DisableKeyword("_ALPHABLEND_ON");
+        mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+        mat.renderQueue = 2000;
+        if (mat.HasProperty("_BaseColor"))
+        {
+            var c = mat.GetColor("_BaseColor");
+            c.a = 1f;
+            mat.SetColor("_BaseColor", c);
+        }
+        var tint = mat.color;
+        tint.a = 1f;
+        mat.color = tint;
+        r.material = mat;
+    }
+
     void Flash(Vector3 point)
     {
         if (_rends == null)
             return;
         for (int i = 0; i < _rends.Length; i++)
         {
-            if (_rends[i] != null)
-                _rends[i].material.color = Color.Lerp(_baseColors != null && i < _baseColors.Length ? _baseColors[i] : _rends[i].material.color, Color.white, 0.45f);
+            if (_rends[i] == null)
+                continue;
+            Color baseC = _baseColors != null && i < _baseColors.Length ? _baseColors[i] : ReadTint(_rends[i]);
+            WriteTint(_rends[i], Color.Lerp(baseC, Color.white, 0.45f));
         }
     }
 
@@ -1079,9 +1187,10 @@ public class RiverShark : MonoBehaviour, IDamageable
         {
             if (_rends[i] == null)
                 continue;
-            var c = _rends[i].material.color;
-            c.a = 1f - t;
-            _rends[i].material.color = c;
+            Color baseC = _baseColors != null && i < _baseColors.Length ? _baseColors[i] : ReadTint(_rends[i]);
+            Color c = Color.Lerp(baseC, baseC * 0.15f, t);
+            c.a = 1f;
+            WriteTint(_rends[i], c);
         }
     }
 }

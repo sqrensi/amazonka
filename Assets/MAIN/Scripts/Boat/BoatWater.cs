@@ -258,7 +258,7 @@ public class BoatWater : MonoBehaviour
         if (follow > 0.35f)
         {
             Vector3 straighten = Vector3.Cross(t != null ? t.up : rb.transform.up, Vector3.up);
-            rb.AddTorque(straighten * (2.4f * frac), ForceMode.Acceleration);
+            rb.AddTorque(straighten * (1.35f * frac), ForceMode.Acceleration);
         }
         rb.angularDamping = Mathf.Lerp(0.8f, follow < 0.25f ? 1.2f : 2.35f, Mathf.Clamp01(frac));
         if (vel.y > 2.4f)
@@ -387,8 +387,11 @@ public class BoatWater : MonoBehaviour
         }
         acc.y = 0f;
         if (acc.sqrMagnitude < 0.04f)
-            return dir * (speed * 0.35f);
-        return acc.normalized * speed;
+            return dir * speed;
+        Vector3 outDir = acc.normalized;
+        if (Vector3.Dot(outDir, dir) < 0.28f)
+            return dir * speed;
+        return outDir * speed;
     }
 
     public Vector3 FlowWorld

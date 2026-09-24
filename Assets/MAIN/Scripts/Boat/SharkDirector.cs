@@ -149,41 +149,62 @@ public class SharkDirector : MonoBehaviour
     {
         pos = origin;
         ambush = false;
-        float roll = Rand();
-        if (roll < 0.55f && TryPathSpawn(origin, prey, 12f, 42f, 0f, 2.2f, true, out pos))
+        if (TryBehindSpawn(origin, prey, 18f, 46f, out pos))
         {
             ambush = true;
             return true;
         }
-        if (TryPathSpawn(origin, prey, 8f, 28f, 0f, 2.4f, false, out pos))
+        if (TryPathSpawn(origin, prey, 22f, 55f, out pos) && !InPlayerView(prey, pos))
             return true;
-        if (roll < 0.8f && TryPathSpawn(origin, prey, 28f, 70f, 0f, 2.0f, true, out pos))
-        {
-            ambush = true;
-            return true;
-        }
         if (TryCloseFlank(origin, prey, out pos))
             return true;
         return TryReachableSpawn(origin, prey, out pos);
     }
 
-    bool TryPathSpawn(Vector3 origin, RaceActor prey, float minAhead, float maxAhead, float minLat, float maxLat, bool allowDeepInView, out Vector3 pos)
+    bool TryBehindSpawn(Vector3 origin, RaceActor prey, float minBack, float maxBack, out Vector3 pos)
+    {
+        pos = origin;
+        Camera cam = PreyCam(prey);
+        Vector3 back = cam != null ? Flatten(-cam.transform.forward) : Flatten(-prey.transform.forward);
+        Vector3 side = Vector3.Cross(Vector3.up, back);
+        if (side.sqrMagnitude < 0.01f)
+            side = Vector3.right;
+        else
+            side.Normalize();
+        for (int i = 0; i < 16; i++)
+        {
+            float dist = Mathf.Lerp(minBack, maxBack, Rand());
+            Vector3 sample = origin + back * dist + side * ((Rand() - 0.5f) * 6f);
+            if (!TryRiverColumn(sample, 2.15f, out sample))
+                continue;
+            if (InPlayerView(prey, sample))
+                continue;
+            float near = Planar(origin, sample);
+            if (near < 16f || near > 110f)
+                continue;
+            if (!CanSwimTo(sample, origin))
+                continue;
+            pos = sample;
+            return true;
+        }
+        return false;
+    }
+
+    bool TryPathSpawn(Vector3 origin, RaceActor prey, float minAhead, float maxAhead, out Vector3 pos)
     {
         pos = origin;
         for (int i = 0; i < 14; i++)
         {
             float ahead = Mathf.Lerp(minAhead, maxAhead, Rand());
-            float lat = Mathf.Lerp(0f, 1.6f, Rand()) * (Rand() < 0.5f ? -1f : 1f);
+            float lat = Mathf.Lerp(0.4f, 2.2f, Rand()) * (Rand() < 0.5f ? -1f : 1f);
             if (!BoatCurrentPath.TryAhead(origin, ahead, lat, out Vector3 sample, out Vector3 tangent))
                 continue;
-            if (!TryRiverColumn(sample, allowDeepInView ? 2.2f : 1.65f, out sample))
+            if (!TryRiverColumn(sample, 2.05f, out sample))
                 continue;
-            if (!allowDeepInView && InPlayerView(prey, sample))
-                continue;
-            if (allowDeepInView && InPlayerView(prey, sample) && !DeepEnough(sample, 1.9f))
+            if (InPlayerView(prey, sample))
                 continue;
             float near = Planar(origin, sample);
-            if (near < 8f || near > 110f)
+            if (near < 16f || near > 110f)
                 continue;
             Vector3 gate = sample + tangent * 5f;
             if (!CanSwimTo(sample, gate) || !CanSwimTo(sample, origin))
@@ -209,7 +230,9 @@ public class SharkDirector : MonoBehaviour
             Vector3 sample = origin + side * sign * (8f + Rand() * 4f) + along * (Rand() * 6f);
             if (!TryRiverColumn(sample, 1.7f, out sample))
                 continue;
-            if (InPlayerView(prey, sample) && !DeepEnough(sample, 1.9f))
+            if (InPlayerView(prey, sample))
+                continue;
+            if (Planar(origin, sample) < 16f)
                 continue;
             if (!CanSwimTo(sample, origin))
                 continue;
@@ -316,7 +339,7 @@ public class SharkDirector : MonoBehaviour
             if (dir.sqrMagnitude < 0.01f)
                 dir = behind ? -along : along;
             dir.Normalize();
-            float dist = 10f + Rand() * 8f;
+            float dist = 16f + Rand() * 14f;
             float lat = (Rand() - 0.5f) * 8f;
             Vector3 sample = origin + dir * dist + side * lat;
             if (!TryRiverColumn(sample, 1.6f, out sample))
@@ -345,9 +368,9 @@ public class SharkDirector : MonoBehaviour
         if (cam == null)
             return false;
         Vector3 vp = cam.WorldToViewportPoint(world);
-        if (vp.z < 1.2f)
+        if (vp.z <= 0.35f)
             return false;
-        const float pad = 0.18f;
+        const float pad = 0.34f;
         return vp.x > -pad && vp.x < 1f + pad && vp.y > -pad && vp.y < 1f + pad;
     }
 

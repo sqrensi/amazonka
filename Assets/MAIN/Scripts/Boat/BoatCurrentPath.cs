@@ -15,6 +15,9 @@ public class BoatCurrentPath : MonoBehaviour
     [SerializeField] float speed = 4.5f;
     [SerializeField] float width = 42f;
 
+    int _flowSeg = -1;
+    Vector3 _flowDir = Vector3.forward;
+
     void OnEnable()
     {
         if (!All.Contains(this))
@@ -37,6 +40,8 @@ public class BoatCurrentPath : MonoBehaviour
 
     public static void ClearRaceWindow()
     {
+        if (RacePath != null)
+            RacePath._flowSeg = -1;
         RacePath = null;
         RaceFrom = 0;
         RaceLen = 0;
@@ -44,7 +49,7 @@ public class BoatCurrentPath : MonoBehaviour
 
     /// <summary>
     /// Each round: a consecutive 15–20 point slice. Launch = first, finish = last.
-    /// Navigation (sharks, InChannel) uses that slice; flow still follows the whole river.
+    /// Flow, sharks and InChannel all follow that slice in child order.
     /// </summary>
     public static bool PickRaceWindow(int seed, int minPoints = 15, int maxPoints = 20)
     {
@@ -68,6 +73,7 @@ public class BoatCurrentPath : MonoBehaviour
             RacePath = path;
             RaceFrom = start;
             RaceLen = want;
+            path._flowSeg = -1;
             return true;
         }
         return false;
@@ -291,6 +297,12 @@ public class BoatCurrentPath : MonoBehaviour
     {
         if (!BoatWater.CurrentEnabled)
             return Vector3.zero;
+        if (HasRaceWindow && RacePath != null && RacePath.isActiveAndEnabled)
+        {
+            if (RacePath.Sample(world, out Vector3 raceFlow, out _))
+                return raceFlow;
+            return Vector3.zero;
+        }
         Vector3 best = Vector3.zero;
         float bestDist = float.PositiveInfinity;
         for (int i = 0; i < All.Count; i++)
@@ -309,18 +321,32 @@ public class BoatCurrentPath : MonoBehaviour
         return best;
     }
 
+    void CollectFlowPoints(List<Transform> into)
+    {
+        if (HasRaceWindow && RacePath == this)
+        {
+            CollectRange(into, RaceFrom, RaceLen);
+            if (into.Count >= 2)
+                return;
+        }
+        Collect(into);
+    }
+
     bool Sample(Vector3 world, out Vector3 flow, out float dist)
     {
         flow = Vector3.zero;
         dist = float.PositiveInfinity;
-        Collect(Tmp);
+        CollectFlowPoints(Tmp);
         if (Tmp.Count < 2)
             return false;
         float maxW = Mathf.Max(4f, width);
+        float outer = maxW * 1.15f;
         Vector3 planar = world;
         planar.y = 0f;
         int bestI = -1;
+        float bestT = 0f;
         Vector3 bestDir = Vector3.forward;
+        float bestScore = float.PositiveInfinity;
         for (int i = 0; i < Tmp.Count - 1; i++)
         {
             if (Tmp[i] == null || Tmp[i + 1] == null)
@@ -333,22 +359,45 @@ public class BoatCurrentPath : MonoBehaviour
             float len = ab.magnitude;
             if (len < 0.05f)
                 continue;
+            Vector3 dir = ab / len;
             float t = Mathf.Clamp01(Vector3.Dot(planar - a, ab) / (len * len));
-            Vector3 proj = a + ab * t;
-            float d = Vector3.Distance(planar, proj);
-            if (d >= dist)
+            float d = Vector3.Distance(planar, a + dir * (t * len));
+            if (d > outer)
                 continue;
+            float score = d;
+            if (_flowSeg >= 0)
+            {
+                score += Mathf.Abs(i - _flowSeg) * 2.4f;
+                if (Vector3.Dot(dir, _flowDir) < -0.12f && i != _flowSeg)
+                    score += 14f;
+            }
+            if (score >= bestScore)
+                continue;
+            bestScore = score;
             dist = d;
             bestI = i;
-            bestDir = ab / len;
+            bestT = t;
+            bestDir = dir;
         }
         if (bestI < 0)
+        {
+            _flowSeg = -1;
             return false;
-        Vector3 dir = bestDir.sqrMagnitude > 0.01f ? bestDir.normalized : Vector3.forward;
-        float outer = maxW * 1.15f;
-        if (dist > outer)
-            return false;
-        flow = dir * speed;
+        }
+        Vector3 use = bestDir;
+        if (bestI + 2 < Tmp.Count && Tmp[bestI + 2] != null && bestT > 0.62f)
+        {
+            Vector3 nxt = PlanarDir(Tmp[bestI + 2].position - Tmp[bestI + 1].position);
+            use = Vector3.Slerp(bestDir, nxt, (bestT - 0.62f) / 0.38f);
+            use.y = 0f;
+            if (use.sqrMagnitude > 0.0001f)
+                use.Normalize();
+            else
+                use = bestDir;
+        }
+        _flowSeg = bestI;
+        _flowDir = use;
+        flow = use * speed;
         return true;
     }
 

@@ -23,6 +23,8 @@ public static class RaceSim
         RaceElapsed = 0f;
         NextNetId = 1;
         RaceRoster.Clear();
+        KillNoticeHUD.ResetKills();
+        KillStyle.ResetRound();
     }
 
     public static ushort AllocId()
@@ -52,6 +54,7 @@ public static class RaceSim
         {
             var actor = RaceRoster.Find(attackerId);
             string name = actor != null && actor.WeaponName != null ? actor.WeaponName : weapon;
+            var style = KillStyle.Evaluate(actor, shark);
             KillNoticeHUD.Show(new KillNoticeHUD.Report
             {
                 killIndex = KillNoticeHUD.NextKillIndex(),
@@ -59,7 +62,9 @@ public static class RaceSim
                 weapon = string.IsNullOrEmpty(name) ? weapon : name,
                 distanceMeters = actor != null
                     ? Vector3.Distance(actor.AimOrigin, shark.transform.position)
-                    : 0f
+                    : 0f,
+                tags = style.tags,
+                points = style.points
             });
         }
     }
@@ -159,6 +164,7 @@ public class RaceActor : MonoBehaviour
         actor.IsLocal = true;
         if (actor.Id == 0)
             actor.Id = RaceSim.AllocId();
+        KillStyle.On(player);
         RaceRoster.Register(actor);
         return actor;
     }
