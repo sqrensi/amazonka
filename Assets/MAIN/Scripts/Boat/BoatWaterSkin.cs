@@ -41,6 +41,7 @@ public class BoatWaterSkin : MonoBehaviour
         var shader = Shader.Find("MAIN/BoatWaterSoft");
         if (shader != null)
             rend.sharedMaterial = new Material(shader);
+        RaceMood.PaintWater(rend);
         var skin = go.AddComponent<BoatWaterSkin>();
         skin._rend = rend;
         return skin;

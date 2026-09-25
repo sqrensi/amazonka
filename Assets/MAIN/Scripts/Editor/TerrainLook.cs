@@ -19,6 +19,7 @@ static class TerrainLook
     {
         EditorApplication.delayCall += TryAuto;
         EditorApplication.delayCall += EnsureTriplanar;
+        EditorApplication.delayCall += RestoreLayerRefsIfBroken;
     }
 
     static void EnsureTriplanar()
@@ -53,6 +54,56 @@ static class TerrainLook
     {
         if (PaintAll())
             EditorPrefs.SetInt(PrefKey, 1);
+    }
+
+    [MenuItem("Horror/Restore Terrain Layers")]
+    public static void MenuRestoreLayers()
+    {
+        RestoreLayerRefs();
+    }
+
+    static void RestoreLayerRefsIfBroken()
+    {
+        var data = AssetDatabase.LoadAssetAtPath<TerrainData>(TerrainPath);
+        if (data == null)
+            return;
+        if (!LayersBroken(data))
+            return;
+        RestoreLayerRefs();
+    }
+
+    static bool LayersBroken(TerrainData data)
+    {
+        var layers = data.terrainLayers;
+        if (layers == null || layers.Length < 8)
+            return true;
+        for (int i = 0; i < layers.Length; i++)
+        {
+            if (layers[i] == null || layers[i].diffuseTexture == null)
+                return true;
+        }
+        return false;
+    }
+
+    public static void RestoreLayerRefs()
+    {
+        var data = AssetDatabase.LoadAssetAtPath<TerrainData>(TerrainPath);
+        if (data == null)
+            return;
+        TerrainLayer[] layers = BuildLayers();
+        if (layers == null || layers.Length < 8)
+            return;
+        data.terrainLayers = layers;
+        EditorUtility.SetDirty(data);
+        var terrains = Object.FindObjectsByType<Terrain>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < terrains.Length; i++)
+        {
+            if (terrains[i] != null && terrains[i].terrainData == data)
+                terrains[i].terrainData.terrainLayers = layers;
+        }
+        if (!Application.isPlaying)
+            AssetDatabase.SaveAssets();
+        Debug.Log("[Terrain] Restored layer textures");
     }
 
     public static bool PaintAll()

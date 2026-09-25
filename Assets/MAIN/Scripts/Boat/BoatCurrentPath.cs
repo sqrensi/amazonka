@@ -14,6 +14,43 @@ public class BoatCurrentPath : MonoBehaviour
 
     [SerializeField] float speed = 4.5f;
     [SerializeField] float width = 42f;
+    float _baseSpeed = -1f;
+
+    public float Speed
+    {
+        get => speed;
+        set => speed = Mathf.Clamp(value, 1.2f, 9f);
+    }
+
+    public static void SetRoundSpeed(float value)
+    {
+        for (int i = 0; i < All.Count; i++)
+        {
+            var p = All[i];
+            if (p == null)
+                continue;
+            if (p._baseSpeed < 0f)
+                p._baseSpeed = p.speed;
+            p.speed = Mathf.Clamp(value, 1.2f, 9f);
+        }
+    }
+
+    public static bool TryRaceWaypoint(int index, out Vector3 pos, out Vector3 tan)
+    {
+        pos = Vector3.zero;
+        tan = Vector3.forward;
+        if (!HasRaceWindow || RacePath == null)
+            return false;
+        RacePath.CollectRange(SpawnPts, RaceFrom, RaceLen);
+        if (index < 0 || index >= SpawnPts.Count || SpawnPts[index] == null)
+            return false;
+        pos = SpawnPts[index].position;
+        if (index + 1 < SpawnPts.Count && SpawnPts[index + 1] != null)
+            tan = PlanarDir(SpawnPts[index + 1].position - pos);
+        else if (index > 0 && SpawnPts[index - 1] != null)
+            tan = PlanarDir(pos - SpawnPts[index - 1].position);
+        return tan.sqrMagnitude > 0.01f;
+    }
 
     int _flowSeg = -1;
     Vector3 _flowDir = Vector3.forward;

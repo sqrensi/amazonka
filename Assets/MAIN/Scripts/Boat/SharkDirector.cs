@@ -149,9 +149,9 @@ public class SharkDirector : MonoBehaviour
     {
         pos = origin;
         ambush = false;
-        if (TryBehindSpawn(origin, prey, 18f, 46f, out pos))
+        if (TryBehindSpawn(origin, prey, 12f, 28f, out pos))
         {
-            ambush = true;
+            ambush = false;
             return true;
         }
         if (TryPathSpawn(origin, prey, 22f, 55f, out pos) && !InPlayerView(prey, pos))

@@ -16,8 +16,20 @@ public static class BoatWaterFx
 
     public static void Splash(Vector3 at, Vector3 along, float power)
     {
+        EmitSplash(at, along, power, true);
+    }
+
+    public static void Impact(Vector3 at, Vector3 along, float power)
+    {
+        EmitSplash(at, along, power, false);
+    }
+
+    static void EmitSplash(Vector3 at, Vector3 along, float power, bool throttle)
+    {
         Ensure();
-        if (_drops == null || Time.time < _nextSplash)
+        if (_drops == null)
+            return;
+        if (throttle && Time.time < _nextSplash)
             return;
         if (!BoatWater.TryHeight(at, out float y))
             return;
@@ -26,33 +38,35 @@ public static class BoatWaterFx
         if (along.sqrMagnitude < 0.01f)
             along = Vector3.forward;
         along.Normalize();
-        power = Mathf.Clamp(power, 0.25f, 1.6f);
-        _nextSplash = Time.time + 0.022f;
+        power = Mathf.Clamp(power, 0.25f, 1.8f);
+        if (throttle)
+            _nextSplash = Time.time + 0.022f;
         Vector3 side = Vector3.Cross(Vector3.up, along);
 
         var emit = new ParticleSystem.EmitParams();
-        int n = 14 + Mathf.RoundToInt(power * 10f);
+        int n = (throttle ? 14 : 24) + Mathf.RoundToInt(power * 10f);
         for (int i = 0; i < n; i++)
         {
-            emit.position = at + side * Random.Range(-0.14f, 0.14f) + along * Random.Range(-0.05f, 0.1f);
-            emit.velocity = along * Random.Range(0.5f, 2.4f) * power
-                + side * Random.Range(-1.35f, 1.35f) * power
-                + Vector3.up * Random.Range(1.3f, 3.4f) * power;
-            emit.startSize = Random.Range(0.016f, 0.05f);
+            emit.position = at + side * Random.Range(-0.2f, 0.2f) + along * Random.Range(-0.08f, 0.12f);
+            emit.velocity = along * Random.Range(0.5f, 2.8f) * power
+                + side * Random.Range(-1.6f, 1.6f) * power
+                + Vector3.up * Random.Range(1.6f, 4.6f) * power;
+            emit.startSize = Random.Range(0.018f, 0.065f) * (throttle ? 1f : 1.3f);
             emit.startColor = DropColor();
-            emit.startLifetime = Random.Range(0.24f, 0.5f);
+            emit.startLifetime = Random.Range(0.26f, 0.55f);
             _drops.Emit(emit, 1);
         }
 
         if (_spray != null)
         {
-            for (int i = 0; i < 2; i++)
+            int mist = throttle ? 2 : 5;
+            for (int i = 0; i < mist; i++)
             {
-                emit.position = at + side * Random.Range(-0.06f, 0.06f);
-                emit.velocity = along * (0.4f * power) + Vector3.up * (0.2f * power);
-                emit.startSize = Random.Range(0.2f, 0.38f) * power;
+                emit.position = at + side * Random.Range(-0.12f, 0.12f);
+                emit.velocity = along * (0.45f * power) + Vector3.up * (0.28f * power);
+                emit.startSize = Random.Range(0.24f, 0.52f) * power;
                 emit.startColor = SprayColor();
-                emit.startLifetime = Random.Range(0.14f, 0.26f);
+                emit.startLifetime = Random.Range(0.16f, 0.34f);
                 _spray.Emit(emit, 1);
             }
         }
@@ -110,8 +124,8 @@ public static class BoatWaterFx
         root.hideFlags = HideFlags.HideAndDontSave;
         Texture2D dropTex = SoftDisc(48, 1.15f);
         Texture2D mistTex = SoftDisc(48, 2.4f);
-        _drops = Make(root.transform, "Drops", 120, 0.35f, 2.6f, dropTex, false);
-        _spray = Make(root.transform, "Spray", 28, 0.2f, 0.05f, mistTex, true);
+        _drops = Make(root.transform, "Drops", 160, 0.35f, 2.6f, dropTex, false);
+        _spray = Make(root.transform, "Spray", 36, 0.2f, 0.05f, mistTex, true);
     }
 
     static ParticleSystem Make(Transform parent, string name, int max, float life, float gravity, Texture2D tex, bool mist)

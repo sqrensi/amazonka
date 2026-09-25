@@ -85,8 +85,6 @@ public class BoatRaceMode : MonoBehaviour
         _sharks = GetComponent<SharkDirector>();
         if (_sharks == null)
             _sharks = gameObject.AddComponent<SharkDirector>();
-        if (GetComponent<RockfallDirector>() == null)
-            gameObject.AddComponent<RockfallDirector>();
         BoatWater.CurrentEnabled = false;
         BoatLayers.Ensure();
     }
@@ -136,6 +134,7 @@ public class BoatRaceMode : MonoBehaviour
         BoatWater.CurrentEnabled = false;
         RaceSim.BeginRound(unchecked(scatterSeed * 397 + (int)(System.DateTime.UtcNow.Ticks & 0x7fffffff)));
         BoatCurrentPath.PickRaceWindow(RaceSim.RoundSeed, 15, 20);
+        RaceMood.ApplyRound(RaceSim.RoundSeed);
         PlaceRaceOnPath();
         _player = FindFirstObjectByType<HorrorFirstPersonController>();
         _actor = RaceActor.BindLocal(_player);

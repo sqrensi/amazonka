@@ -9,6 +9,8 @@ using UnityEngine.Rendering.Universal;
 public class GameLook : MonoBehaviour
 {
     Volume _volume;
+    ColorAdjustments _color;
+    WhiteBalance _wb;
 
     void Awake()
     {
@@ -41,14 +43,31 @@ public class GameLook : MonoBehaviour
         vig.color.Override(new Color(0.08f, 0.09f, 0.1f));
 
         var color = profile.Add<ColorAdjustments>(true);
+        _color = color;
         color.postExposure.Override(0.62f);
         color.contrast.Override(10f);
         color.saturation.Override(18f);
         color.hueShift.Override(0f);
 
         var wb = profile.Add<WhiteBalance>(true);
+        _wb = wb;
         wb.temperature.Override(6f);
         wb.tint.Override(-1f);
+    }
+
+    public void SetRound(float exposure, float contrast, float sat, float temp, float tint)
+    {
+        if (_color != null)
+        {
+            _color.postExposure.Override(exposure);
+            _color.contrast.Override(contrast);
+            _color.saturation.Override(sat);
+        }
+        if (_wb != null)
+        {
+            _wb.temperature.Override(temp);
+            _wb.tint.Override(tint);
+        }
     }
 
     void LateUpdate()

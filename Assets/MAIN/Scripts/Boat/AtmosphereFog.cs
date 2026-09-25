@@ -30,25 +30,14 @@ public class AtmosphereFog : MonoBehaviour
     {
         if (UnderwaterFx.Covering)
             return;
-        Apply();
-    }
-
-    void Apply()
-    {
-        Vector3 pos = _cam != null ? _cam.transform.position : Vector3.zero;
-        float waterY = 0f;
-        bool water = BoatWater.TryHeight(pos, out waterY);
-        float height = water ? pos.y - waterY : 18f;
-        float low = 1f - Mathf.SmoothStep(0f, Mathf.Max(6f, hazeHeight), Mathf.Max(0f, height));
-
-        Color fog = Color.Lerp(air, nearWater, low * 0.55f);
-        fog = Color.Lerp(fog, Color.white, 0.12f);
-        if (_sun != null && _cam != null)
+        if (RaceMood.FogOn)
         {
-            float intoSun = Mathf.Clamp01(Vector3.Dot(_cam.transform.forward, -_sun.transform.forward));
-            fog = Color.Lerp(fog, Color.Lerp(fog, _sun.color, 0.22f), intoSun * 0.22f);
+            RenderSettings.fog = true;
+            RenderSettings.fogMode = FogMode.ExponentialSquared;
+            RenderSettings.fogColor = RaceMood.FogColor;
+            RenderSettings.fogDensity = RaceMood.FogDensity;
+            return;
         }
-
         RenderSettings.fog = false;
     }
 }

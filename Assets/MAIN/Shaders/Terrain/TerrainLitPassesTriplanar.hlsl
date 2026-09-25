@@ -57,6 +57,7 @@ struct Varyings
 
 float3 _TerrainWorldSize;
 float _TerrainTriplanarSharp;
+float3 _TerrainSeasonTint;
 
 float3 TerrainTriBlend(float3 n)
 {
@@ -432,7 +433,7 @@ void SplatmapFragment(
 
     half3 normalTS = half3(0.0h, 0.0h, 1.0h);
 #ifdef TERRAIN_SPLAT_BASEPASS
-    half3 albedo = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, IN.uvMainAndLM.xy).rgb;
+    half3 albedo = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, IN.uvMainAndLM.xy).rgb * max(_TerrainSeasonTint, 0.01);
     half smoothness = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, IN.uvMainAndLM.xy).a;
     half metallic = SAMPLE_TEXTURE2D(_MetallicTex, sampler_MetallicTex, IN.uvMainAndLM.xy).r;
     half alpha = 1;
@@ -457,7 +458,7 @@ void SplatmapFragment(
     half4 mixedDiffuse;
     half4 defaultSmoothness;
     SplatmapMix(IN.uvMainAndLM, IN.uvSplat01, IN.uvSplat23, IN.positionWS, IN.normal.xyz, splatControl, weight, mixedDiffuse, defaultSmoothness, normalTS);
-    half3 albedo = mixedDiffuse.rgb;
+    half3 albedo = mixedDiffuse.rgb * max(_TerrainSeasonTint, 0.01);
 
     half4 defaultMetallic = half4(_Metallic0, _Metallic1, _Metallic2, _Metallic3);
     half4 defaultOcclusion = half4(_MaskMapRemapScale0.g, _MaskMapRemapScale1.g, _MaskMapRemapScale2.g, _MaskMapRemapScale3.g) +

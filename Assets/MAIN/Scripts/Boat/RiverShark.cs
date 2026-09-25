@@ -533,7 +533,7 @@ public class RiverShark : MonoBehaviour, IDamageable
             side = -side;
 
         Vector3 aim;
-        float burst;
+        float extra;
         if (blinded)
         {
             if (_stunDir.sqrMagnitude < 0.01f)
@@ -544,77 +544,53 @@ public class RiverShark : MonoBehaviour, IDamageable
                 _stunDir = right;
             _stunDir.Normalize();
             aim = pos + _stunDir * 12f;
-            burst = CatchSpeed(carry, range, 0.72f);
+            extra = CatchExtra(range, 0.82f);
         }
         else if (_pass == Pass.Ambush)
         {
-            Vector3 flowDir = carry.sqrMagnitude > 0.2f ? carry.normalized : boatDir;
-            float boatAlong = Vector3.Dot(chase - pos, flowDir);
-            if (range < 24f || boatAlong > 6f || _rage > 0.25f)
-            {
-                _pass = Pass.Lunge;
-                _lungeUntil = RaceSim.RaceElapsed + Random.Range(1.2f, 2.1f);
-            }
-            Vector3 home = _peelPoint;
-            home.y = pos.y;
-            Vector3 patrol = home + side * (Mathf.Sin(Time.time * 0.32f + _jukePhase) * 3.2f);
-            aim = patrol;
-            burst = CatchSpeed(carry, range, 0.55f);
+            _pass = Pass.Hunt;
+            aim = Intercept(chase, carry, pos);
+            extra = CatchExtra(range, 1.05f);
         }
         else if (_pass == Pass.Peel)
         {
             if (RaceSim.RaceElapsed >= _peelUntil || _rage > 0.7f)
-                _pass = _kind == Kind.Stalker ? Pass.Circle : Pass.Hunt;
+                _pass = Pass.Hunt;
             float hold = Planar(_peelPoint, pos);
-            if (hold < 2.4f || range > 22f)
+            if (hold < 2.4f || range > 14f)
             {
                 aim = Intercept(chase, carry, pos);
-                burst = CatchSpeed(carry, range, 0.9f);
+                extra = CatchExtra(range, 1.05f);
             }
             else
             {
                 aim = _peelPoint;
-                burst = CatchSpeed(carry, range, 0.78f);
+                extra = CatchExtra(range, 0.95f);
             }
         }
         else if (_pass == Pass.Circle)
         {
-            if (RaceSim.RaceElapsed >= _moodUntil || range < 7.5f || _rage > 0.4f)
-            {
-                _pass = Pass.Lunge;
-                _lungeUntil = RaceSim.RaceElapsed + Random.Range(1.15f, 1.9f);
-            }
-            float radius = 9.5f + Mathf.Sin(Time.time * 0.35f + _jukePhase) * 1.4f;
-            Vector3 tangent = chase + side * radius + boatDir * 3.2f;
-            aim = tangent;
-            burst = CatchSpeed(carry, range, 0.95f);
+            _pass = Pass.Lunge;
+            _lungeUntil = RaceSim.RaceElapsed + Random.Range(1.15f, 1.9f);
+            aim = Intercept(chase, carry, pos);
+            extra = CatchExtra(range, 1.15f);
         }
         else if (_pass == Pass.Lunge)
         {
             if (RaceSim.RaceElapsed >= _lungeUntil && range > biteRange + 1.2f)
                 _pass = Pass.Hunt;
             aim = Intercept(chase, carry, pos);
-            burst = CatchSpeed(carry, range, 1.22f + _rage * 0.28f);
+            extra = CatchExtra(range, 1.28f + _rage * 0.28f);
         }
         else
         {
-            float weave = Mathf.Sin(Time.time * _jukeHz + _jukePhase) * _jukeAmp * (0.45f + (1f - _rage) * 0.55f);
+            float weave = Mathf.Sin(Time.time * _jukeHz + _jukePhase) * _jukeAmp * 0.35f * (1f - _rage);
             aim = Intercept(chase, carry, pos) + side * weave;
-            burst = CatchSpeed(carry, range, 1f + _rage * 0.22f);
+            extra = CatchExtra(range, 1.08f + _rage * 0.22f);
             if (range < 14f && Vector3.Dot(_heading, boatDir) > 0.62f && Random.value < dt * 0.55f)
             {
                 _pass = Pass.Lunge;
                 _lungeUntil = RaceSim.RaceElapsed + Random.Range(0.9f, 1.6f);
-            }
-            else if (_kind == Kind.Stalker && !_rising && range > 11f && RaceSim.RaceElapsed >= _moodUntil)
-            {
-                if (Random.value < 0.4f)
-                {
-                    _pass = Pass.Circle;
-                    _moodUntil = RaceSim.RaceElapsed + Random.Range(2.2f, 4.4f);
-                }
-                else
-                    _moodUntil = RaceSim.RaceElapsed + Random.Range(1.8f, 3.4f);
             }
         }
 
@@ -660,10 +636,9 @@ public class RiverShark : MonoBehaviour, IDamageable
         if (_avoid.sqrMagnitude > 0.01f)
             wishDir = FlatDir(wishDir + _avoid * 1.35f, wishDir);
 
-        float wishSpeed = burst;
-        wishSpeed *= Mathf.Lerp(1f, 0.84f, Mathf.Clamp01(_avoid.magnitude));
+        extra *= Mathf.Lerp(1f, 0.9f, Mathf.Clamp01(_avoid.magnitude));
         if (blinded)
-            wishSpeed *= 0.7f;
+            extra *= 0.78f;
 
         _smoothCarry = Vector3.Lerp(_smoothCarry, carry, 1f - Mathf.Exp(-2.6f * dt));
         if (_heading.sqrMagnitude < 0.01f || !Finite(_heading))
@@ -677,10 +652,17 @@ public class RiverShark : MonoBehaviour, IDamageable
         float signed = Vector3.SignedAngle(prevHead, _heading, Vector3.up) / Mathf.Max(dt, 0.0001f);
         _yawRate = Mathf.Lerp(_yawRate, signed, 1f - Mathf.Exp(-5.5f * dt));
 
-        float accel = range > 16f ? 7.2f : 4.4f;
+        float accel = range > 16f ? 16f : 9f;
         accel *= 1f + _rage * 0.25f;
-        _speed = Mathf.MoveTowards(_speed, wishSpeed, accel * dt);
-        _smoothVel = _heading * _speed;
+        _speed = Mathf.MoveTowards(_speed, extra, accel * dt);
+        Vector3 ride = flow;
+        ride.y = 0f;
+        if (ride.sqrMagnitude < 0.2f)
+        {
+            ride = carry;
+            ride.y = 0f;
+        }
+        _smoothVel = ride + _heading * _speed;
 
         Vector3 from = pos;
         float surfY = from.y;
@@ -692,7 +674,7 @@ public class RiverShark : MonoBehaviour, IDamageable
         Vector3 next = Glide(from, from + planarStep);
         next.y = Mathf.MoveTowards(from.y, surfY, (_rising ? 6.4f : 2.8f) * dt);
         next = NudgeOut(next, dt);
-        next = SharkDirector.StayInRiver(next, Mathf.Clamp(_speed * dt, 0.02f, 0.065f));
+        next = SharkDirector.StayInRiver(next, Mathf.Max(planarStep.magnitude + 0.12f, 0.22f));
         if (!Finite(next))
         {
             _smoothVel = Vector3.zero;
@@ -730,7 +712,7 @@ public class RiverShark : MonoBehaviour, IDamageable
 
         if (!Finite(_simPosVel))
             _simPosVel = Vector3.zero;
-        _simPos = Vector3.SmoothDamp(_simPos, next, ref _simPosVel, 0.055f, 16f, dt);
+        _simPos = Vector3.SmoothDamp(_simPos, next, ref _simPosVel, 0.04f, 36f, dt);
         _simRot = rot;
         ApplySimPose();
 
@@ -792,7 +774,7 @@ public class RiverShark : MonoBehaviour, IDamageable
             _heading.Normalize();
         _aimSmooth = here + pull * 8f;
         _aimDamp = Vector3.zero;
-        _speed = Mathf.Min(_speed, Cruise() * 0.55f);
+        _speed = Mathf.Max(_speed, 4.5f * _kindSpeed);
         _pass = Pass.Hunt;
     }
 
@@ -810,17 +792,15 @@ public class RiverShark : MonoBehaviour, IDamageable
         return moveSpeed * _kindSpeed;
     }
 
-    float CatchSpeed(Vector3 boatVel, float range, float drive)
+    float CatchExtra(float range, float drive)
     {
-        boatVel.y = 0f;
-        float boat = boatVel.magnitude;
-        float extra = 1.35f * _kindSpeed;
-        extra += Mathf.Lerp(0f, 2.8f, Mathf.InverseLerp(10f, 32f, range)) * _kindSpeed;
-        extra += _rage * 0.4f;
+        drive = Mathf.Clamp(drive, 0.85f, 1.4f);
+        float extra = 3.6f * _kindSpeed;
+        extra += Mathf.Lerp(2.4f, 8.2f, Mathf.InverseLerp(4f, 40f, range)) * _kindSpeed;
+        extra += _rage * 0.55f;
         if (_pass == Pass.Lunge)
-            extra += 0.55f;
-        drive = Mathf.Clamp(drive, 0.85f, 1.12f);
-        return boat + extra * drive;
+            extra += 1.5f;
+        return extra * drive;
     }
 
     static Vector3 Intercept(Vector3 chase, Vector3 boatVel, Vector3 from)
@@ -831,10 +811,8 @@ public class RiverShark : MonoBehaviour, IDamageable
         float dist = rel.magnitude;
         if (dist < 0.2f)
             return chase;
-        Vector3 toward = rel / dist;
-        float closing = 2.4f - Vector3.Dot(boatVel, toward);
-        float t = dist / Mathf.Max(2.2f, closing);
-        t = Mathf.Clamp(t, 0.2f, 1.85f);
+        float t = dist / 6.5f;
+        t = Mathf.Clamp(t, 0.15f, 1.4f);
         Vector3 lead = chase + boatVel * t;
         lead.y = chase.y;
         return lead;
