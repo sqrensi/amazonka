@@ -770,7 +770,7 @@ public class HouseBuildMode : MonoBehaviour
                     keepSet.Add(_buf[i]);
             }
             var frozen = new List<BoatPiece>(keepSet);
-            for (int i = 0; i < frozen.Length; i++)
+            for (int i = 0; i < frozen.Count; i++)
             {
                 var p = frozen[i];
                 if (p == null)
