@@ -8,9 +8,19 @@ using UnityEngine.Rendering.Universal;
 [DefaultExecutionOrder(85)]
 public class GameLook : MonoBehaviour
 {
-    Volume _volume;
     ColorAdjustments _color;
     WhiteBalance _wb;
+    Volume _volume;
+    float _exposure;
+    float _contrast;
+    float _sat;
+    float _temp;
+    float _tint;
+    float _exposureTo;
+    float _contrastTo;
+    float _satTo;
+    float _tempTo;
+    float _tintTo;
 
     void Awake()
     {
@@ -48,30 +58,63 @@ public class GameLook : MonoBehaviour
         color.contrast.Override(10f);
         color.saturation.Override(18f);
         color.hueShift.Override(0f);
+        _exposure = _exposureTo = 0.62f;
+        _contrast = _contrastTo = 10f;
+        _sat = _satTo = 18f;
 
         var wb = profile.Add<WhiteBalance>(true);
         _wb = wb;
         wb.temperature.Override(6f);
         wb.tint.Override(-1f);
+        _temp = _tempTo = 6f;
+        _tint = _tintTo = -1f;
     }
 
-    public void SetRound(float exposure, float contrast, float sat, float temp, float tint)
+    public void SetRound(float exposure, float contrast, float sat, float temp, float tint, bool instant = false)
+    {
+        _exposureTo = exposure;
+        _contrastTo = contrast;
+        _satTo = sat;
+        _tempTo = temp;
+        _tintTo = tint;
+        if (instant)
+            SnapGrade();
+    }
+
+    void SnapGrade()
+    {
+        _exposure = _exposureTo;
+        _contrast = _contrastTo;
+        _sat = _satTo;
+        _temp = _tempTo;
+        _tint = _tintTo;
+        ApplyGrade();
+    }
+
+    void ApplyGrade()
     {
         if (_color != null)
         {
-            _color.postExposure.Override(exposure);
-            _color.contrast.Override(contrast);
-            _color.saturation.Override(sat);
+            _color.postExposure.Override(_exposure);
+            _color.contrast.Override(_contrast);
+            _color.saturation.Override(_sat);
         }
         if (_wb != null)
         {
-            _wb.temperature.Override(temp);
-            _wb.tint.Override(tint);
+            _wb.temperature.Override(_temp);
+            _wb.tint.Override(_tint);
         }
     }
 
     void LateUpdate()
     {
+        float k = 1f - Mathf.Exp(-Time.unscaledDeltaTime * 0.55f);
+        _exposure = Mathf.Lerp(_exposure, _exposureTo, k);
+        _contrast = Mathf.Lerp(_contrast, _contrastTo, k);
+        _sat = Mathf.Lerp(_sat, _satTo, k);
+        _temp = Mathf.Lerp(_temp, _tempTo, k);
+        _tint = Mathf.Lerp(_tint, _tintTo, k);
+        ApplyGrade();
         if (_volume != null)
             _volume.weight = UnderwaterFx.Covering ? 0.12f : 1f;
     }

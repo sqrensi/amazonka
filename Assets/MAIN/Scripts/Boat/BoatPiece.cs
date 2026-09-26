@@ -221,6 +221,8 @@ public class BoatPiece : MonoBehaviour, IInteractable
 
     public bool TryRow(GameObject player)
     {
+        if (this == null)
+            return false;
         if (kind == BoatPieceKind.Oar)
         {
             if (!CanRow(player) && !BoatOarStation.IsUsing(this))
@@ -303,6 +305,8 @@ public class BoatPiece : MonoBehaviour, IInteractable
 
     static bool RaceWaterLive()
     {
+        if (PlaySession.MenuOpen || PlaySession.Active == PlaySession.Mode.HouseHold)
+            return false;
         var race = BoatRaceMode.Current;
         if (race == null)
             return true;
@@ -314,6 +318,11 @@ public class BoatPiece : MonoBehaviour, IInteractable
 
     public bool CanRide()
     {
+        if (PlaySession.Active == PlaySession.Mode.HouseHold && HouseBuildMode.Holding)
+        {
+            CollectIsland(IslandTmp);
+            return IslandTmp.Count > 1 || HasDrivenNail() || IsLockedInBoat();
+        }
         if (!RaceWaterLive())
         {
             _rideWetUntil = 0f;
@@ -552,6 +561,9 @@ public class BoatPiece : MonoBehaviour, IInteractable
 
     bool CarrySameObject(PlayerInventory inv)
     {
+        var move = inv != null ? inv.GetComponent<HorrorFirstPersonController>() : null;
+        if (move != null)
+            move.SuppressPickupLaunch();
         DetachLooseNails();
         BoatMaterialItem.BeginCarry(kind, pieceSize, KindName(kind), transform.rotation);
         var item = gameObject.GetComponent<BoatMaterialItem>();
@@ -642,19 +654,7 @@ public class BoatPiece : MonoBehaviour, IInteractable
 
     public void RestOnShore()
     {
-        if (_rb == null)
-            _rb = GetComponent<Rigidbody>();
-        if (_rb == null)
-            return;
-        if (!_rb.isKinematic)
-        {
-            _rb.linearVelocity = Vector3.zero;
-            _rb.angularVelocity = Vector3.zero;
-        }
-        _rb.interpolation = RigidbodyInterpolation.Interpolate;
-        _rb.isKinematic = true;
-        _rb.detectCollisions = true;
-        _rb.useGravity = false;
+        WakeForWater();
     }
 
     public void WakeForWater()
@@ -667,7 +667,9 @@ public class BoatPiece : MonoBehaviour, IInteractable
             return;
         _rb.isKinematic = false;
         _rb.useGravity = true;
-        _rb.interpolation = RigidbodyInterpolation.Interpolate;
+        _rb.interpolation = PlaySession.Active == PlaySession.Mode.HouseHold
+            ? RigidbodyInterpolation.None
+            : RigidbodyInterpolation.Interpolate;
         _rb.detectCollisions = true;
         if (LaunchSettling)
         {
@@ -838,8 +840,10 @@ public class BoatPiece : MonoBehaviour, IInteractable
 
         if (!RaceWaterLive())
         {
-            if (_rb != null && IslandTmp.Count > 1 && lead == this)
-                RestOnShore();
+            if (_rb != null && !_weldSlave && _rb.isKinematic)
+                WakeForWater();
+            if (_rb != null && !_rb.isKinematic && PlaySession.Active == PlaySession.Mode.HouseHold)
+                _rb.interpolation = RigidbodyInterpolation.None;
             return;
         }
 
@@ -1250,6 +1254,17 @@ public class BoatPiece : MonoBehaviour, IInteractable
         return false;
     }
 
+    public bool HasAnyNail()
+    {
+        for (int i = 0; i < _nails.Count; i++)
+        {
+            var n = _nails[i];
+            if (n != null && n.A != null && n.B != null)
+                return true;
+        }
+        return false;
+    }
+
     public bool HasDrivenNail()
     {
         for (int i = 0; i < _nails.Count; i++)
@@ -1274,7 +1289,7 @@ public class BoatPiece : MonoBehaviour, IInteractable
         return BoatRope.IsTied(this);
     }
 
-    public bool IsLockedInBoat() => HasDrivenNail() || BoatRope.IsTied(this) || _weldSlave || (kind == BoatPieceKind.Oar && OarIsMounted());
+    public bool IsLockedInBoat() => HasAnyNail() || HasDrivenNail() || BoatRope.IsTied(this) || _weldSlave || (kind == BoatPieceKind.Oar && OarIsMounted());
 
     public bool TrySolidBounds(out Bounds bounds)
     {
@@ -1425,20 +1440,26 @@ public class BoatPiece : MonoBehaviour, IInteractable
 
     public void CollectIsland(List<BoatPiece> into)
     {
+        if (into == null)
+            return;
+        into.Clear();
+        if (this == null)
+            return;
         IslandQueue.Clear();
         IslandSeen.Clear();
         IslandQueue.Add(this);
         IslandSeen.Add(this);
-        into.Clear();
         while (IslandQueue.Count > 0)
         {
             BoatPiece p = IslandQueue[IslandQueue.Count - 1];
             IslandQueue.RemoveAt(IslandQueue.Count - 1);
+            if (p == null)
+                continue;
             into.Add(p);
             for (int i = 0; i < p._nails.Count; i++)
             {
                 BoatNail n = p._nails[i];
-                if (n == null || !n.Driven)
+                if (n == null || n.A == null || n.B == null)
                     continue;
                 TryAddIsland(n.A);
                 TryAddIsland(n.B);
@@ -1590,16 +1611,7 @@ public class BoatPiece : MonoBehaviour, IInteractable
         Physics.SyncTransforms();
         var other = SpawnTwin(offWorld, rot, offSize, offUv0, offUv1);
         RelocateFasteners(other, axis, cut, keepLeft);
-
-        Vector3 along = transform.TransformDirection(AxisUnit(axis));
-        float away = keepLeft ? 1f : -1f;
-        if (other.Body != null)
-        {
-            other.Body.maxDepenetrationVelocity = 0.4f;
-            BoatBuildUtil.SetMotion(other.Body, vel * 0.25f + along * away * 0.45f, Vector3.zero);
-        }
-
-        IgnoreCollidersBrief(BoatBuildUtil.SolidCollider(this), BoatBuildUtil.SolidCollider(other), 0.55f);
+        SeparateCut(other, axis, keepLeft);
         BoatIsland.Refresh(this);
         if (other != null)
             BoatIsland.Refresh(other);
@@ -1628,6 +1640,44 @@ public class BoatPiece : MonoBehaviour, IInteractable
         if (leftScore == 0 && rightScore == 0)
             return leftLen >= rightLen;
         return leftScore >= rightScore;
+    }
+
+    void SeparateCut(BoatPiece offcut, int axis, bool keepLeft)
+    {
+        if (offcut == null)
+            return;
+        Vector3 along = transform.TransformDirection(AxisUnit(axis));
+        if (along.sqrMagnitude < 0.0001f)
+            along = Vector3.up;
+        along.Normalize();
+        float away = keepLeft ? 1f : -1f;
+        Vector3 offDir = along * away;
+        offcut.transform.position += offDir * 0.07f;
+        Physics.SyncTransforms();
+
+        bool stacked = Mathf.Abs(Vector3.Dot(offDir, Vector3.up)) > 0.55f;
+        Rigidbody body = offcut.Body;
+        if (body != null)
+        {
+            Vector3 v = body.linearVelocity * 0.2f + offDir * (stacked ? 0.15f : 0.55f);
+            if (stacked)
+            {
+                Vector3 side = Vector3.Cross(Vector3.up, offDir);
+                if (side.sqrMagnitude < 0.01f)
+                    side = Vector3.Cross(transform.right, Vector3.up);
+                if (side.sqrMagnitude > 0.01f)
+                    v += side.normalized * 1.25f;
+                if (Vector3.Dot(offDir, Vector3.up) > 0.2f)
+                    v += Vector3.up * 0.35f;
+                body.maxDepenetrationVelocity = 8f;
+            }
+            else
+                body.maxDepenetrationVelocity = 2f;
+            BoatBuildUtil.SetMotion(body, v, Vector3.zero);
+        }
+
+        if (!stacked)
+            IgnoreCollidersBrief(BoatBuildUtil.SolidCollider(this), BoatBuildUtil.SolidCollider(offcut), 0.28f);
     }
 
     void ScoreRopes(int axis, float cut, ref int leftScore, ref int rightScore)
@@ -1866,7 +1916,8 @@ public class BoatPiece : MonoBehaviour, IInteractable
             _rb = gameObject.AddComponent<Rigidbody>();
         _rb.mass = Mathf.Max(0.4f, BoatVisuals.Mass(kind) * (pieceSize.x * pieceSize.y * pieceSize.z) /
             (BoatVisuals.DefaultSize(kind).x * BoatVisuals.DefaultSize(kind).y * BoatVisuals.DefaultSize(kind).z));
-        _rb.interpolation = RigidbodyInterpolation.Interpolate;
+        bool house = PlaySession.Active == PlaySession.Mode.HouseHold;
+        _rb.interpolation = house ? RigidbodyInterpolation.None : RigidbodyInterpolation.Interpolate;
         _rb.collisionDetectionMode = kind == BoatPieceKind.Plank || kind == BoatPieceKind.Log
             ? CollisionDetectionMode.ContinuousDynamic
             : CollisionDetectionMode.ContinuousSpeculative;

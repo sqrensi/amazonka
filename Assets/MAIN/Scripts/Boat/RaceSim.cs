@@ -48,25 +48,45 @@ public static class RaceSim
         if (target == null || target.IsDead)
             return;
         target.TakeDamage(amount, point, dir);
-        if (target is RiverShark)
-            PickupPromptHUD.MarkHit();
-        if (target is RiverShark shark && shark.IsDead)
+        PickupPromptHUD.MarkHit();
+        if (target.IsDead)
+            AnnounceKill(attackerId, target, weapon);
+    }
+
+    public static void AnnounceKill(ushort attackerId, IDamageable target, string weapon)
+    {
+        if (target == null)
+            return;
+        var actor = RaceRoster.Find(attackerId);
+        if (actor == null)
+            actor = RaceRoster.Local();
+        string name = actor != null && actor.WeaponName != null ? actor.WeaponName : weapon;
+        Vector3 pos = Vector3.zero;
+        var comp = target as Component;
+        if (comp != null)
+            pos = comp.transform.position;
+        float dist = actor != null ? Vector3.Distance(actor.AimOrigin, pos) : 0f;
+        var style = KillStyle.Evaluate(actor, pos);
+        KillNoticeHUD.Show(new KillNoticeHUD.Report
         {
-            var actor = RaceRoster.Find(attackerId);
-            string name = actor != null && actor.WeaponName != null ? actor.WeaponName : weapon;
-            var style = KillStyle.Evaluate(actor, shark);
-            KillNoticeHUD.Show(new KillNoticeHUD.Report
-            {
-                killIndex = KillNoticeHUD.NextKillIndex(),
-                target = shark.DisplayName,
-                weapon = string.IsNullOrEmpty(name) ? weapon : name,
-                distanceMeters = actor != null
-                    ? Vector3.Distance(actor.AimOrigin, shark.transform.position)
-                    : 0f,
-                tags = style.tags,
-                points = style.points
-            });
-        }
+            killIndex = KillNoticeHUD.NextKillIndex(),
+            target = KillName(target),
+            weapon = string.IsNullOrEmpty(name) ? weapon : name,
+            distanceMeters = dist,
+            tags = style.tags,
+            points = style.points
+        });
+    }
+
+    static string KillName(IDamageable target)
+    {
+        if (target is RiverShark shark)
+            return shark.DisplayName;
+        if (target is HouseBombBird)
+            return "Bird";
+        if (target is HouseBombEgg)
+            return "Egg";
+        return "Target";
     }
 }
 

@@ -201,12 +201,8 @@ public class BoatClusterItem : HeldItem
 
     void Place(Vector3 pos, Quaternion rot)
     {
-        if (_ghost != null && _ghost.activeInHierarchy)
-        {
-            pos = _ghost.transform.position;
-            rot = _ghost.transform.rotation;
-        }
         BoatBuildHud.Clear();
+        BoatBuildUtil.RememberPlaceY(pos, rot, Vector3.zero, _localSize);
         ClearGhost();
         Inventory?.ClearEquippedKeepObject();
         ReleaseToWorld(pos, rot, Vector3.zero);
@@ -255,7 +251,7 @@ public class BoatClusterItem : HeldItem
             if (p == null)
                 continue;
             p.transform.SetParent(null, true);
-            p.WakeInWorld(false);
+            p.WakeInWorld(true);
         }
         BoatRope.UnparentOwned(pieces);
 

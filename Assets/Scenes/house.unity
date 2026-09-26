@@ -531,6 +531,7 @@ GameObject:
   - component: {fileID: 115138188}
   - component: {fileID: 115138187}
   - component: {fileID: 115138186}
+  - component: {fileID: 115138189}
   m_Layer: 0
   m_Name: BoatRace
   m_TagString: Untagged
@@ -550,6 +551,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7d5c3fd6bc7f74949bcca4f391d21370, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BoatRaceHud
+--- !u!114 &115138189
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 115138185}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: edfba7913ffe6d8429c1a40991b593ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HouseBuildMode
+  buildSeconds: 150
+  holdSeconds: 90
+  restartKey: 114
 --- !u!114 &115138187
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -581,7 +597,8 @@ MonoBehaviour:
   - {fileID: 3315366849479072024, guid: 365440a667add214d813ed6b9d83c0bc, type: 3}
   - {fileID: 1924003664845465155, guid: ad34850d108ef7b4b801d6054622effa, type: 3}
   - {fileID: 6913548082214779988, guid: 4310a770be030084d972b10403a07ace, type: 3}
-  lootCounts: 120000000a000000020000001e00000005000000010000000100000001000000
+  - {fileID: 491026650538521818, guid: b809b612cba24814a824766deb70bedb, type: 3}
+  lootCounts: 120000000a000000020000001e0000000500000001000000010000000100000001000000
   scatterRadius: 18
   scatterSeed: 17
   autoStart: 1
@@ -807,7 +824,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &192200010
 Transform:
   m_ObjectHideFlags: 0
@@ -4690,7 +4707,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 411421552200760341, guid: cbbefc4098a5f1c4489dad04a18594e6, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1802408775019718685, guid: cbbefc4098a5f1c4489dad04a18594e6, type: 3}
       propertyPath: m_LocalScale.x
@@ -5011,7 +5028,7 @@ TerrainCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_TerrainData: {fileID: 15600000, guid: 55ea8b8dc4760be45831e1898e3fd9c0, type: 2}
+  m_TerrainData: {fileID: 15600000, guid: 9f3e2c8a1b4d4a6e8c0f2d5b7a9e1c3d, type: 2}
   m_EnableTreeColliders: 1
 --- !u!218 &1785355853
 Terrain:
@@ -5022,7 +5039,7 @@ Terrain:
   m_GameObject: {fileID: 1785355851}
   m_Enabled: 1
   serializedVersion: 6
-  m_TerrainData: {fileID: 15600000, guid: 55ea8b8dc4760be45831e1898e3fd9c0, type: 2}
+  m_TerrainData: {fileID: 15600000, guid: 9f3e2c8a1b4d4a6e8c0f2d5b7a9e1c3d, type: 2}
   m_TreeDistance: 5000
   m_TreeBillboardDistance: 50
   m_TreeCrossFadeLength: 5

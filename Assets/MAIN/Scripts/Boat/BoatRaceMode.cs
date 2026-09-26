@@ -75,17 +75,23 @@ public class BoatRaceMode : MonoBehaviour
     public Transform WaterLaunch => waterLaunch;
     public Transform PlayerSpawn => playerSpawn;
 
+    public bool IsLootSource(GameObject go)
+    {
+        if (go == null || lootPrefabs == null)
+            return false;
+        for (int i = 0; i < lootPrefabs.Length; i++)
+        {
+            if (lootPrefabs[i] == go)
+                return true;
+        }
+        return false;
+    }
+
+    public IReadOnlyList<GameObject> SpawnedLoot => _spawnedLoot;
+
     void Awake()
     {
-        Current = this;
-        _hud = GetComponent<BoatRaceHud>();
-        if (_hud == null)
-            _hud = gameObject.AddComponent<BoatRaceHud>();
         EnsureFinishTrigger();
-        _sharks = GetComponent<SharkDirector>();
-        if (_sharks == null)
-            _sharks = gameObject.AddComponent<SharkDirector>();
-        BoatWater.CurrentEnabled = false;
         BoatLayers.Ensure();
     }
 
@@ -100,7 +106,13 @@ public class BoatRaceMode : MonoBehaviour
 
     void Start()
     {
-        if (autoStart)
+        if (PlaySession.IsHouseScene)
+            return;
+        if (PlaySession.Active == PlaySession.Mode.HouseHold)
+            return;
+        if (PlaySession.Active == PlaySession.Mode.None)
+            PlaySession.Choose(PlaySession.Mode.BoatRace);
+        if (PlaySession.Active == PlaySession.Mode.BoatRace)
             BeginRound();
     }
 
@@ -129,15 +141,31 @@ public class BoatRaceMode : MonoBehaviour
         _score = 0;
         _failReason = "";
         _craft = null;
+        Current = this;
+        _hud = GetComponent<BoatRaceHud>();
+        if (_hud == null)
+            _hud = gameObject.AddComponent<BoatRaceHud>();
+        _hud.enabled = true;
+        _hud.EnsureBuilt();
         _offBoatSince = -1f;
         _sunkSince = -1f;
         BoatWater.CurrentEnabled = false;
         RaceSim.BeginRound(unchecked(scatterSeed * 397 + (int)(System.DateTime.UtcNow.Ticks & 0x7fffffff)));
         BoatCurrentPath.PickRaceWindow(RaceSim.RoundSeed, 15, 20);
-        RaceMood.ApplyRound(RaceSim.RoundSeed);
+        try
+        {
+            RaceMood.ApplyRound(RaceSim.RoundSeed);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning("[Race] mood failed: " + e.Message);
+        }
         PlaceRaceOnPath();
         _player = FindFirstObjectByType<HorrorFirstPersonController>();
         _actor = RaceActor.BindLocal(_player);
+        _sharks = GetComponent<SharkDirector>();
+        if (_sharks == null)
+            _sharks = gameObject.AddComponent<SharkDirector>();
         if (_sharks != null)
             _sharks.Clear();
         if (_player != null)
@@ -932,36 +960,52 @@ public class BoatRaceMode : MonoBehaviour
 
     void ScatterLoot()
     {
+        ScatterSupplies(false, 0);
+    }
+
+    public void ScatterSupplies(bool skipOar, int minPlanks)
+    {
+        Vector3 origin = playerSpawn != null ? playerSpawn.position : Vector3.zero;
+        Vector3 fwd = playerSpawn != null ? Flatten(playerSpawn.forward) : Vector3.forward;
+        ScatterSupplies(origin, fwd, skipOar, minPlanks);
+    }
+
+    public void ScatterSupplies(Vector3 origin, Vector3 fwd, bool skipOar, int minPlanks)
+    {
         for (int i = 0; i < _spawnedLoot.Count; i++)
         {
-            if (_spawnedLoot[i] != null)
-                Destroy(_spawnedLoot[i]);
+            var go = _spawnedLoot[i];
+            if (go == null || IsLootSource(go))
+                continue;
+            DestroyImmediate(go);
         }
         _spawnedLoot.Clear();
-        if (!scatterLoot || lootPrefabs == null || lootPrefabs.Length == 0 || playerSpawn == null)
+        if (!scatterLoot || lootPrefabs == null || lootPrefabs.Length == 0)
             return;
 
-        Vector3 origin = playerSpawn.position;
-        Vector3 fwd = Flatten(playerSpawn.forward);
+        fwd = Flatten(fwd);
         Vector3 right = Vector3.Cross(Vector3.up, fwd);
         if (right.sqrMagnitude < 0.0001f)
-            right = playerSpawn.right;
-        right.y = 0f;
+            right = Vector3.right;
         right.Normalize();
         Vector3 pile = origin + fwd * 2.6f;
-        pile.y = GroundY(pile + Vector3.up * 4f, origin.y);
+        pile.y = GroundY(pile + Vector3.up * 80f, origin.y);
 
         for (int i = 0; i < lootPrefabs.Length; i++)
         {
             var prefab = lootPrefabs[i];
             if (prefab == null)
                 continue;
+            string name = prefab.name;
+            if (skipOar && name.IndexOf("Oar", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                continue;
             int count = 1;
             if (lootCounts != null && i < lootCounts.Length)
                 count = Mathf.Max(0, lootCounts[i]);
+            if (name.IndexOf("Plank", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                count = Mathf.Max(count, minPlanks);
             if (count <= 0)
                 continue;
-            string name = prefab.name;
             if (name.IndexOf("Plank", System.StringComparison.OrdinalIgnoreCase) >= 0)
                 LayPlanks(prefab, count, pile, right, fwd);
             else if (name.IndexOf("Log", System.StringComparison.OrdinalIgnoreCase) >= 0)
@@ -976,6 +1020,8 @@ public class BoatRaceMode : MonoBehaviour
                 LayRow(prefab, count, pile + fwd * -0.85f + right * 0.35f, right, 0.35f, Quaternion.LookRotation(fwd));
             else if (name.IndexOf("Saw", System.StringComparison.OrdinalIgnoreCase) >= 0)
                 LayRow(prefab, count, pile + fwd * -0.85f + right * -0.15f, right, 0.35f, Quaternion.LookRotation(fwd));
+            else if (name.IndexOf("Pistol", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                LayRow(prefab, count, pile + fwd * -0.85f + right * 0.75f, right, 0.32f, Quaternion.LookRotation(fwd));
             else if (name.IndexOf("Oar", System.StringComparison.OrdinalIgnoreCase) >= 0)
                 LayRow(prefab, count, pile + right * -2.05f, fwd, 0.28f, Quaternion.LookRotation(right));
             else
@@ -1060,7 +1106,7 @@ public class BoatRaceMode : MonoBehaviour
 
     static float GroundY(Vector3 from, float fallback)
     {
-        if (Physics.Raycast(from, Vector3.down, out RaycastHit hit, 12f, ~0, QueryTriggerInteraction.Ignore))
+        if (Physics.Raycast(from, Vector3.down, out RaycastHit hit, 200f, ~0, QueryTriggerInteraction.Ignore))
         {
             if (hit.collider != null && hit.collider.GetComponentInParent<BoatWater>() == null)
                 return hit.point.y;

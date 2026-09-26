@@ -112,12 +112,18 @@ public class KillStyle : MonoBehaviour
 
     public static Result Evaluate(RaceActor actor, RiverShark shark)
     {
+        Vector3 pos = shark != null ? shark.transform.position : Vector3.zero;
+        return Evaluate(actor, pos);
+    }
+
+    public static Result Evaluate(RaceActor actor, Vector3 targetPos)
+    {
         var tags = new List<Tag>(6);
         var move = actor != null ? actor.GetComponent<HorrorFirstPersonController>() : null;
         var style = move != null ? On(move) : _live;
         float dist = 0f;
-        if (actor != null && shark != null)
-            dist = Vector3.Distance(actor.AimOrigin, shark.transform.position);
+        if (actor != null)
+            dist = Vector3.Distance(actor.AimOrigin, targetPos);
 
         if (style != null)
         {

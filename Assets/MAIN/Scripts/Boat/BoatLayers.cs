@@ -2,7 +2,8 @@ using UnityEngine;
 
 /// <summary>
 /// Слои лодки и россыпи: физика не видит прицел.
-/// Сваренная лодка (BoatPhysics) не сталкивается сама с собой.
+/// Сваренная конструкция — compound на одном Rigidbody, самопересечений нет.
+/// Разные острова на BoatPhysics сталкиваются (стена об стену).
 /// Россыпь (BoatLoose) сталкивается друг с другом и с лодкой.
 /// </summary>
 public static class BoatLayers
@@ -20,24 +21,25 @@ public static class BoatLayers
 
     public static void Ensure()
     {
-        if (_ready)
-            return;
-        Physics = LayerMask.NameToLayer(PhysicsName);
-        Interact = LayerMask.NameToLayer(InteractName);
-        if (Interact < 0)
-            Interact = LayerMask.NameToLayer(InteractName + " ");
-        Loose = LayerMask.NameToLayer(LooseName);
-        if (Physics >= 0)
-            UnityEngine.Physics.IgnoreLayerCollision(Physics, Physics, true);
-        if (Interact >= 0)
+        if (!_ready)
         {
-            UnityEngine.Physics.IgnoreLayerCollision(Interact, Interact, true);
-            if (Physics >= 0)
-                UnityEngine.Physics.IgnoreLayerCollision(Interact, Physics, true);
-            if (Loose >= 0)
-                UnityEngine.Physics.IgnoreLayerCollision(Interact, Loose, true);
+            Physics = LayerMask.NameToLayer(PhysicsName);
+            Interact = LayerMask.NameToLayer(InteractName);
+            if (Interact < 0)
+                Interact = LayerMask.NameToLayer(InteractName + " ");
+            Loose = LayerMask.NameToLayer(LooseName);
+            if (Interact >= 0)
+            {
+                UnityEngine.Physics.IgnoreLayerCollision(Interact, Interact, true);
+                if (Physics >= 0)
+                    UnityEngine.Physics.IgnoreLayerCollision(Interact, Physics, true);
+                if (Loose >= 0)
+                    UnityEngine.Physics.IgnoreLayerCollision(Interact, Loose, true);
+            }
+            _ready = true;
         }
-        _ready = true;
+        if (Physics >= 0)
+            UnityEngine.Physics.IgnoreLayerCollision(Physics, Physics, false);
     }
 
     public static int PhysicsLayer(bool assembled)

@@ -68,6 +68,13 @@ public class UnderwaterFx : MonoBehaviour
     {
         if (_cam == null)
             return;
+        if (PlaySession.Active == PlaySession.Mode.HouseHold || PlaySession.MenuOpen)
+        {
+            _latched = false;
+            Covering = false;
+            ApplyVisuals(false, 0f, 0f);
+            return;
+        }
 
         Vector3 pos = _cam.transform.position;
         bool overWater = BoatWater.TryHeight(pos, out float surfaceY);

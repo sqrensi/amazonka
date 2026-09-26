@@ -150,8 +150,8 @@ public static class BoatBuildUtil
         return item != null && !item.IsCarried;
     }
 
-    static readonly Collider[] SupportScratch = new Collider[32];
-    static readonly Collider[] SitScratch = new Collider[24];
+    static readonly Collider[] SupportScratch = new Collider[96];
+    static readonly Collider[] SitScratch = new Collider[48];
 
     /// <summary>
     /// Высота опоры только если деталь своим следом реально ложится на другую.
@@ -162,13 +162,14 @@ public static class BoatBuildUtil
     {
         topY = float.NegativeInfinity;
         Vector3 half = size * 0.5f;
-        half.x = Mathf.Max(0.03f, half.x * 0.94f);
-        half.z = Mathf.Max(0.03f, half.z * 0.94f);
+        half.x = Mathf.Max(0.04f, half.x * 0.92f);
+        half.z = Mathf.Max(0.04f, half.z * 0.92f);
         Vector3 searchHalf = half;
-        searchHalf.y = Mathf.Max(0.4f, half.y);
-        Vector3 searchPos = new Vector3(xz.x, floorY + searchHalf.y, xz.z);
+        searchHalf.y = 0.85f;
+        Vector3 searchPos = new Vector3(xz.x, floorY + 0.15f, xz.z);
         int n = Physics.OverlapBoxNonAlloc(searchPos, searchHalf, SupportScratch, rot, ~0, QueryTriggerInteraction.Ignore);
         bool any = false;
+        float best = float.PositiveInfinity;
         for (int i = 0; i < n; i++)
         {
             var col = SupportScratch[i];
@@ -178,32 +179,28 @@ public static class BoatBuildUtil
                 continue;
             if (!IsBoatTarget(col))
                 continue;
-            if (col.bounds.max.y <= floorY + 0.005f)
-                continue;
 
             float candY = col.bounds.max.y;
-            Vector3 sitPos = new Vector3(xz.x, candY, xz.z);
-            Vector3 sitHalf = new Vector3(half.x, 0.08f, half.z);
-            int m = Physics.OverlapBoxNonAlloc(sitPos, sitHalf, SitScratch, rot, ~0, QueryTriggerInteraction.Ignore);
-            bool rests = false;
-            for (int s = 0; s < m; s++)
-            {
-                if (SitScratch[s] == col)
-                {
-                    rests = true;
-                    break;
-                }
-            }
-            if (!rests)
+            if (candY < floorY - 0.35f || candY > floorY + 0.85f)
                 continue;
 
-            float y = candY;
+            Vector3 probe = new Vector3(xz.x, candY, xz.z);
+            Vector3 closest = ClosestPoint(col, probe);
+            Vector3 planar = closest - probe;
+            planar.y = 0f;
+            float rad = Mathf.Max(half.x, half.z) + 0.12f;
+            if (planar.sqrMagnitude > rad * rad)
+                continue;
+
+            float y = closest.y;
             Vector3 origin = new Vector3(xz.x, candY + 0.45f, xz.z);
             if (col.Raycast(new Ray(origin, Vector3.down), out RaycastHit onTop, 1.4f))
                 y = onTop.point.y;
-            if (!any || y > topY)
+            float dist = Mathf.Abs(y - floorY);
+            if (!any || dist < best - 0.01f || (Mathf.Abs(dist - best) < 0.01f && y > topY))
             {
                 topY = y;
+                best = dist;
                 any = true;
             }
         }
@@ -261,42 +258,173 @@ public static class BoatBuildUtil
             return worldCenter - rot * localCenter;
         }
 
-        Vector3 probe = size;
-        probe.x = Mathf.Clamp(size.x, 0.08f, 1.25f);
-        probe.z = Mathf.Clamp(size.z, 0.08f, 1.25f);
-        probe.y = Mathf.Max(size.y, 0.06f);
-
-        float sitY = seedY;
-        if (TrySpanSupportY(at, seedY - 0.2f, rot, probe, owner, out float liftY))
-            sitY = Mathf.Max(sitY, liftY);
-
-        return LiftOrigin(new Vector3(at.x, sitY, at.z), rot, localCenter, size, sitY);
+        Vector3 pos = LiftOrigin(new Vector3(at.x, seedY, at.z), rot, localCenter, size, seedY);
+        pos = SuggestLayerSit(pos, rot, localCenter, size, owner, seedY);
+        return ResolveOverlapSit(pos, rot, localCenter, size, owner);
     }
 
-    static bool TrySpanSupportY(Vector3 at, float floorY, Quaternion rot, Vector3 size, GameObject ignore, out float topY)
+    static float _layerY;
+    static float _layerUntil;
+    static Vector3 _layerXZ;
+
+    public static void RememberPlaceY(Vector3 pos, Quaternion rot, Vector3 localCenter, Vector3 size)
     {
-        topY = float.NegativeInfinity;
-        bool any = false;
-        Vector3 along = rot * Vector3.forward;
-        float halfLen = Mathf.Max(0.12f, size.z * 0.48f);
-        Vector3 pad = new Vector3(Mathf.Max(0.1f, size.x * 0.85f), size.y, 0.16f);
-        for (int i = -3; i <= 3; i++)
+        Vector3 worldC = pos + rot * localCenter;
+        _layerY = worldC.y - ProjectExtent(rot, size, Vector3.up);
+        _layerXZ = pos;
+        _layerUntil = Time.time + 48f;
+    }
+
+    static Vector3 SuggestLayerSit(Vector3 pos, Quaternion rot, Vector3 localCenter, Vector3 size, GameObject owner, float seedY)
+    {
+        Camera cam = Cam(owner);
+        Vector3 look = cam != null ? cam.transform.forward : Vector3.forward;
+        float feet = owner != null ? owner.transform.position.y : seedY;
+        float lookH = cam != null ? cam.transform.position.y + look.y * 2.5f : seedY;
+        float rec = seedY;
+
+        if (look.y > -0.5f && TryBandDeckY(pos, rot, size, owner, lookH, 1.05f, out float bandY))
+            rec = Mathf.Max(rec, bandY);
+
+        if (Time.time < _layerUntil)
         {
-            Vector3 p = at + along * (halfLen * i / 3f);
-            if (!TryBlockedSupportY(p, floorY, rot, pad, ignore, out float y))
-                continue;
-            if (!any || y > topY)
+            Vector3 flat = pos - _layerXZ;
+            flat.y = 0f;
+            if (flat.sqrMagnitude < 20f && look.y > -0.44f && Mathf.Abs(lookH - _layerY) < 0.9f)
             {
-                topY = y;
+                if (TryBandDeckY(pos, rot, size, owner, _layerY, 0.5f, out float ly))
+                    rec = ly;
+                else if (Mathf.Abs(seedY - _layerY) > 0.16f)
+                    rec = Mathf.Lerp(seedY, _layerY, 0.7f);
+            }
+        }
+
+        if (feet - seedY > 0.48f && look.y > -0.42f)
+        {
+            float stand = feet + 0.05f;
+            if (TryBandDeckY(pos, rot, size, owner, stand, 0.75f, out float sy))
+                rec = Mathf.Max(rec, sy);
+            else
+                rec = Mathf.Max(rec, stand);
+        }
+
+        if (rec <= seedY + 0.07f)
+            return pos;
+        return LiftOrigin(new Vector3(pos.x, rec, pos.z), rot, localCenter, size, rec);
+    }
+
+    static bool TryBandDeckY(Vector3 pos, Quaternion rot, Vector3 size, GameObject ignore, float band, float slack, out float y)
+    {
+        y = 0f;
+        Vector3 worldC = new Vector3(pos.x, band, pos.z);
+        Vector3 half = size * 0.5f;
+        half.x = Mathf.Max(0.14f, half.x);
+        half.z = Mathf.Max(0.14f, half.z);
+        half.y = Mathf.Max(0.28f, slack);
+        int n = Physics.OverlapBoxNonAlloc(worldC, half, SupportScratch, rot, ~0, QueryTriggerInteraction.Ignore);
+        bool any = false;
+        float best = float.PositiveInfinity;
+        for (int i = 0; i < n; i++)
+        {
+            var col = SupportScratch[i];
+            if (!UsableSupport(col, ignore))
+                continue;
+            float top = Mathf.Max(col.bounds.max.y, PieceTopY(col, worldC));
+            float d = Mathf.Abs(top - band);
+            if (d > slack)
+                continue;
+            if (!any || d < best)
+            {
+                y = top;
+                best = d;
                 any = true;
             }
         }
-        if (TryBlockedSupportY(at, floorY, rot, size, ignore, out float mid))
-        {
-            topY = any ? Mathf.Max(topY, mid) : mid;
-            any = true;
-        }
         return any;
+    }
+
+    static float _sitStickY;
+    static bool _sitStick;
+    static float _sitStickUntil;
+
+    static Vector3 ResolveOverlapSit(Vector3 pos, Quaternion rot, Vector3 localCenter, Vector3 size, GameObject ignore)
+    {
+        bool hit = TryPenetratedRestY(pos, rot, localCenter, size, ignore, out float restY);
+        if (hit)
+        {
+            if (_sitStick && restY < _sitStickY - 0.12f && Time.time < _sitStickUntil)
+                restY = _sitStickY;
+            else if (_sitStick)
+                restY = Mathf.Lerp(_sitStickY, restY, 0.35f);
+            _sitStick = true;
+            _sitStickY = restY;
+            _sitStickUntil = Time.time + 0.28f;
+            return LiftOrigin(new Vector3(pos.x, restY, pos.z), rot, localCenter, size, restY);
+        }
+        if (_sitStick && Time.time < _sitStickUntil)
+            return LiftOrigin(new Vector3(pos.x, _sitStickY, pos.z), rot, localCenter, size, _sitStickY);
+        _sitStick = false;
+        return pos;
+    }
+
+    static bool TryPenetratedRestY(Vector3 pos, Quaternion rot, Vector3 localCenter, Vector3 size, GameObject ignore, out float restY)
+    {
+        restY = float.NegativeInfinity;
+        Vector3 worldC = pos + rot * localCenter;
+        Vector3 half = size * 0.5f;
+        half.x = Mathf.Max(0.04f, half.x * 0.9f);
+        half.y = Mathf.Max(0.02f, half.y * 0.9f);
+        half.z = Mathf.Max(0.04f, half.z * 0.9f);
+        float bottom = worldC.y - ProjectExtent(rot, size, Vector3.up);
+        int hits = 0;
+
+        int n = Physics.OverlapBoxNonAlloc(worldC, half, SupportScratch, rot, ~0, QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < n; i++)
+            ConsiderSupport(SupportScratch[i], ignore, worldC, bottom, ref restY, ref hits);
+
+        Vector3 along = rot * Vector3.forward;
+        float rad = Mathf.Max(0.05f, Mathf.Max(half.x, half.y) * 0.9f);
+        float len = half.z;
+        for (int s = -2; s <= 2; s++)
+        {
+            Vector3 p = worldC + along * (len * s / 2f);
+            int m = Physics.OverlapSphereNonAlloc(p, rad, SitScratch, ~0, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < m; i++)
+                ConsiderSupport(SitScratch[i], ignore, worldC, bottom, ref restY, ref hits);
+        }
+
+        return hits > 0;
+    }
+
+    static void ConsiderSupport(Collider col, GameObject ignore, Vector3 worldC, float bottom, ref float restY, ref int hits)
+    {
+        if (!UsableSupport(col, ignore))
+            return;
+        float top = Mathf.Max(col.bounds.max.y, PieceTopY(col, worldC));
+        if (top <= bottom + 0.04f)
+            return;
+        if (top > restY)
+            restY = top;
+        hits++;
+    }
+
+    static bool UsableSupport(Collider col, GameObject ignore)
+    {
+        if (col == null || col.isTrigger || !IsBoatTarget(col))
+            return false;
+        if (ignore != null && (col.transform == ignore.transform || col.transform.IsChildOf(ignore.transform)))
+            return false;
+        return true;
+    }
+
+    static float PieceTopY(Collider col, Vector3 near)
+    {
+        Vector3 closest = ClosestPoint(col, new Vector3(near.x, col.bounds.max.y, near.z));
+        Vector3 origin = closest + Vector3.up * 0.55f;
+        origin.y = Mathf.Max(origin.y, col.bounds.max.y + 0.35f);
+        if (col.Raycast(new Ray(origin, Vector3.down), out RaycastHit hit, 2.2f))
+            return hit.point.y;
+        return col.bounds.max.y;
     }
 
     public static void FollowGhost(ref bool ready, ref Vector3 pos, ref Vector3 vel, ref Quaternion rot, Vector3 targetPos, Quaternion targetRot)
@@ -307,10 +435,11 @@ public static class BoatBuildUtil
             rot = targetRot;
             vel = Vector3.zero;
             ready = true;
+            _sitStick = false;
             return;
         }
-        pos = Vector3.SmoothDamp(pos, targetPos, ref vel, 0.22f, Mathf.Infinity, Time.deltaTime);
-        rot = Quaternion.Slerp(rot, targetRot, 1f - Mathf.Exp(-4.2f * Time.deltaTime));
+        pos = Vector3.SmoothDamp(pos, targetPos, ref vel, 0.26f, 8.5f, Time.deltaTime);
+        rot = Quaternion.Slerp(rot, targetRot, 1f - Mathf.Exp(-4.4f * Time.deltaTime));
     }
 
     public static Vector3 LiftOrigin(Vector3 pos, Quaternion rot, Vector3 localCenter, Vector3 size, float supportY)
@@ -339,6 +468,7 @@ public static class BoatBuildUtil
         nail.Aim = pos;
         a.RegisterNail(nail);
         b.RegisterNail(nail);
+        nail.BindPlanted();
         return nail;
     }
 
@@ -400,6 +530,13 @@ public static class BoatBuildUtil
     {
         if (a == null || b == null || a == b)
             return;
+        Rigidbody ra = a.IslandRootBody() ?? a.Body;
+        Rigidbody rb = b.IslandRootBody() ?? b.Body;
+        if (ra != null && ra == rb)
+        {
+            StopMotion(ra);
+            return;
+        }
         var ca = SolidCollider(a);
         var cb = SolidCollider(b);
         if (ca == null || cb == null)

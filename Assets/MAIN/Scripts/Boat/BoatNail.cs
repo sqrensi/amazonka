@@ -149,9 +149,38 @@ public class BoatNail : MonoBehaviour, IInteractable
         item.SetDisplayName("Nail");
     }
 
+    public void BindPlanted()
+    {
+        if (Driven || A == null || B == null)
+            return;
+        DisconnectJointKeepState();
+        Rigidbody ra = A.IslandRootBody() ?? A.Body;
+        Rigidbody rb = B.IslandRootBody() ?? B.Body;
+        if (ra == null || rb == null || ra == rb)
+            return;
+        _joint = ra.gameObject.AddComponent<FixedJoint>();
+        _joint.connectedBody = rb;
+        _joint.breakForce = Mathf.Infinity;
+        _joint.breakTorque = Mathf.Infinity;
+        _joint.enableCollision = false;
+        _joint.enablePreprocessing = true;
+    }
+
     public void Drive()
     {
         if (Driven || A == null || B == null)
+            return;
+
+        Driven = true;
+        BoatLayers.BindPickup(this, false);
+        Hide();
+
+        Rigidbody ra = A.IslandRootBody() ?? A.Body;
+        Rigidbody rb = B.IslandRootBody() ?? B.Body;
+        if (ra != null && ra == rb)
+            return;
+
+        if (A.SharesIslandWith(B) && A.IsLockedInBoat() && B.IsLockedInBoat())
             return;
 
         if (_joint != null)
@@ -160,13 +189,11 @@ public class BoatNail : MonoBehaviour, IInteractable
             _joint = null;
         }
 
-        BoatBuildUtil.SnapTogether(A, B, Aim);
+        bool bothLocked = A.IsLockedInBoat() && B.IsLockedInBoat();
+        if (!bothLocked)
+            BoatBuildUtil.SnapTogether(A, B, Aim);
         BoatBuildUtil.StopMotion(A.Body);
         BoatBuildUtil.StopMotion(B.Body);
-
-        Driven = true;
-        BoatLayers.BindPickup(this, false);
-        Hide();
         BoatIsland.Refresh(A);
     }
 

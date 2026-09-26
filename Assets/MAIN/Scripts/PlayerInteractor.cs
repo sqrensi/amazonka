@@ -77,9 +77,9 @@ public class PlayerInteractor : MonoBehaviour
             BoatOarStation.Toggle(gameObject, BoatOarStation.Active.Oar);
             return;
         }
-        if (_current is BoatPiece piece)
+        if (_current is BoatPiece piece && piece != null)
             piece.TryRow(gameObject);
-        else if (_current is BoatPart part && part.Piece != null)
+        else if (_current is BoatPart part && part != null && part.Piece != null)
             part.Piece.TryRow(gameObject);
     }
 

@@ -169,7 +169,7 @@ public class PistolItem : HeldItem
 
     float SharkDamage(IDamageable target)
     {
-        if (target is RiverShark)
+        if (target is RiverShark || target is HouseBombBird || target is HouseBombEgg)
             return 64f;
         return damage;
     }

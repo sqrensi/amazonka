@@ -53,7 +53,14 @@ public class BoatRaceHud : MonoBehaviour
     void Awake()
     {
         Active = this;
-        Build();
+        EnsureBuilt();
+    }
+
+    public void EnsureBuilt()
+    {
+        Active = this;
+        if (_canvas == null)
+            Build();
     }
 
     void OnDestroy()
@@ -94,8 +101,9 @@ public class BoatRaceHud : MonoBehaviour
         scaler.matchWidthOrHeight = 0.5f;
         _root = go.GetComponent<RectTransform>();
 
-        _fade = Solid(_root, "Fade", new Color(0f, 0f, 0f, 1f));
+        _fade = Solid(_root, "Fade", new Color(0f, 0f, 0f, 0f));
         Stretch(_fade.rectTransform);
+        _fade.gameObject.SetActive(false);
 
         _hurt = Solid(_root, "Hurt", new Color(0.55f, 0.05f, 0.04f, 0f));
         _hurt.sprite = Vignette();
@@ -175,15 +183,74 @@ public class BoatRaceHud : MonoBehaviour
 
     public IEnumerator PlayIntro()
     {
+        yield return PlayIntro("THE RIVER", "Build what you can. Then hold the water.");
+    }
+
+    public IEnumerator PlayIntro(string title, string sub)
+    {
+        yield return PlayIntro(title, sub, true);
+    }
+
+    public IEnumerator PlayIntro(string title, string sub, bool blackout)
+    {
         _canRestart = false;
         _busy = true;
-        SetFade(1f);
+        SetFade(blackout ? 1f : 0f);
         _playGroup.alpha = 0f;
         _titleGroup.gameObject.SetActive(true);
         HideResult();
-        yield return Title("THE RIVER", "Build what you can. Then hold the water.", 2.2f);
-        yield return FadeTo(0f, 1.15f);
+        yield return Title(title, sub, blackout ? 2.2f : 1.1f);
+        if (blackout)
+            yield return FadeTo(0f, 1.15f);
+        else
+            SetFade(0f);
         _busy = false;
+    }
+
+    public void ClearFade()
+    {
+        SetFade(0f);
+        if (_playGroup != null)
+            _playGroup.alpha = 1f;
+    }
+
+    public void PrepareNewRound()
+    {
+        _canRestart = false;
+        _busy = false;
+        _hurtAmt = 0f;
+        HideResult();
+        ClearFade();
+        if (_titleGroup != null)
+        {
+            _titleGroup.alpha = 0f;
+            _titleGroup.gameObject.SetActive(true);
+        }
+    }
+
+    public IEnumerator PlayHoldOpen()
+    {
+        _phaseText.text = "HOLD";
+        _statusText.text = "Keep the house standing";
+        _statusText.color = White;
+        yield return FadePlay(1f, 0.4f);
+        yield return Title("HOLD", "If it loses its strength, it falls.", 1.7f);
+    }
+
+    public void SetStatus(string line, bool danger = false)
+    {
+        if (_statusText == null)
+            return;
+        _statusText.color = danger ? Danger : White;
+        _statusText.text = line ?? "";
+    }
+
+    public void FlashWarn(string title, string sub)
+    {
+        EnsureBuilt();
+        if (!isActiveAndEnabled)
+            return;
+        StartCoroutine(Title(title, sub, 1.55f));
     }
 
     public IEnumerator PlayBuildOpen()

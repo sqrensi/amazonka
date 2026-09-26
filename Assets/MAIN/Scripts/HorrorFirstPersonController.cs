@@ -116,6 +116,7 @@ public class HorrorFirstPersonController : MonoBehaviour
     float _rideIgnoreUntil;
     float _offRaftUntil;
     float _launchSeatUntil;
+    float _pickupSettleUntil;
     float _jumpLift;
     float _jumpLiftVel;
     float _jumpLiftPrev;
@@ -127,6 +128,10 @@ public class HorrorFirstPersonController : MonoBehaviour
     bool _wasAtSwimSurface;
     Vector3 _swimVel;
     int _lastFootstepIndex = -1;
+    Vector3 _groundNrm = Vector3.up;
+    float _slopeAngle;
+    bool _onSteepTerrain;
+    const float TerrainWalkSlope = 68f;
     Vector3 _camPosVelocity;
     float _camRoll;
     Vector2 _lookSmoothed;
@@ -172,6 +177,29 @@ public class HorrorFirstPersonController : MonoBehaviour
     public bool IsSwimming { get; private set; }
     public bool IsOnCraft => _rideBoat != null && !IsSwimming;
 
+    public void ApplyGroundLurch(Vector3 delta)
+    {
+        if (_controller == null || !_controller.enabled)
+            return;
+        if (delta.sqrMagnitude < 0.0000001f)
+            return;
+        _controller.Move(delta);
+        _physPos += delta;
+        _physPosPrev += delta;
+    }
+
+    public void WarpTo(Vector3 pos, Quaternion rot)
+    {
+        ReleaseBoatFollow();
+        if (_controller != null)
+            _controller.enabled = false;
+        transform.SetPositionAndRotation(pos, rot);
+        SyncPhysPose();
+        if (_controller != null)
+            _controller.enabled = true;
+        Physics.SyncTransforms();
+    }
+
     bool HoldingLaunchSeat => Time.unscaledTime < _launchSeatUntil && _rideBoat != null;
 
     public void ArmLaunchSeat(float seconds)
@@ -189,6 +217,7 @@ public class HorrorFirstPersonController : MonoBehaviour
     {
         _controller = GetComponent<CharacterController>();
         _controller.enableOverlapRecovery = true;
+        _controller.slopeLimit = Mathf.Max(_controller.slopeLimit, TerrainWalkSlope);
         _defaultStepOffset = _controller.stepOffset;
         _playerInput = GetComponent<PlayerInput>();
         if (_playerInput != null && _playerInput.actions != null)
@@ -235,8 +264,16 @@ public class HorrorFirstPersonController : MonoBehaviour
 
     void Start()
     {
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
+        if (!PlaySession.MenuOpen)
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
+        else
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
 
         if (playerCamera != null)
             playerCamera.fieldOfView = baseFov;
@@ -338,6 +375,13 @@ public class HorrorFirstPersonController : MonoBehaviour
 
     void HandleCursor()
     {
+        if (PlaySession.MenuOpen)
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            return;
+        }
+
         if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
         {
             Cursor.lockState = CursorLockMode.None;
@@ -353,6 +397,8 @@ public class HorrorFirstPersonController : MonoBehaviour
 
     void UpdateLook()
     {
+        if (PlaySession.MenuOpen)
+            return;
         float ySign = invertY ? 1f : -1f;
         float scale = lookSensitivity;
         if (_playerInput != null && _playerInput.currentControlScheme == "Gamepad")
@@ -500,6 +546,11 @@ public class HorrorFirstPersonController : MonoBehaviour
         bool wantsSprint = SprintHeld && !IsCrouching && planar.sqrMagnitude > 0.05f;
         if (useStamina)
             wantsSprint &= _stamina > 0.05f;
+        float quakeMove = HouseBuildMode.MoveScale;
+        if (quakeMove < 0.84f)
+            wantsSprint = false;
+        if (_onSteepTerrain && _slopeAngle > 26f)
+            wantsSprint = false;
         IsSprinting = wantsSprint;
 
         if (useStamina)
@@ -528,6 +579,8 @@ public class HorrorFirstPersonController : MonoBehaviour
             targetSpeed = IsSprinting ? 2.35f : 1.65f;
         else if (inWater)
             targetSpeed *= 0.85f;
+        if (!swimming && quakeMove < 0.999f)
+            targetSpeed *= quakeMove;
 
         if (!swimming && planar.sqrMagnitude < 0.0001f)
             targetSpeed = 0f;
@@ -553,12 +606,16 @@ public class HorrorFirstPersonController : MonoBehaviour
 
         _heaving = false;
 
-        if (grounded && _verticalVelocity < 0f)
+        if (grounded && _verticalVelocity < 0f && !_onSteepTerrain)
             _verticalVelocity = -2f;
 
         if (_jumpQueued && !IsCrouching && _coyoteTime > 0f)
         {
-            _verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
+            float jh = jumpHeight;
+            if (_onSteepTerrain)
+                jh *= Mathf.Lerp(1f, 0.72f, Mathf.InverseLerp(22f, 58f, _slopeAngle));
+            _verticalVelocity = Mathf.Sqrt(jh * -2f * gravity);
+            velocity = planar * (_currentSpeed * 0.82f);
             _jumpQueued = false;
             PlayJumpSound();
             _jumpedThisAir = true;
@@ -569,35 +626,51 @@ public class HorrorFirstPersonController : MonoBehaviour
         else
         {
             _jumpQueued = false;
+            if (grounded && !_jumpedThisAir)
+                velocity = SlopeWalk(planar, _currentSpeed);
         }
 
-        if (overWater && !grounded && _verticalVelocity < 0f && feetY < waterY + 0.45f)
+        if (_jumpedThisAir || !grounded)
         {
-            _verticalVelocity += gravity * 0.55f * dt;
-            if (_verticalVelocity < -4.5f)
-                _verticalVelocity = Mathf.Lerp(_verticalVelocity, -3.2f, 1f - Mathf.Exp(-6f * dt));
+            if (overWater && !grounded && _verticalVelocity < 0f && feetY < waterY + 0.45f)
+            {
+                _verticalVelocity += gravity * 0.55f * dt;
+                if (_verticalVelocity < -4.5f)
+                    _verticalVelocity = Mathf.Lerp(_verticalVelocity, -3.2f, 1f - Mathf.Exp(-6f * dt));
+            }
+            else
+                _verticalVelocity += gravity * dt;
+            velocity.y = _verticalVelocity;
+        }
+        else if (!_onSteepTerrain)
+        {
+            _verticalVelocity += gravity * dt;
+            velocity.y = _verticalVelocity;
         }
         else
-            _verticalVelocity += gravity * dt;
-        velocity.y = _verticalVelocity;
+            _verticalVelocity = velocity.y;
 
         Vector3 before = transform.position;
         _controller.Move(velocity * dt);
 
         // CC на выпуклых MeshCollider (брёвна дома) может вытолкнуть вверх,
         // как будто зашагивает на стену. В воздухе это отменяем.
-        if (!grounded && _verticalVelocity <= 0f && !overWater)
+        bool settlePickup = Time.time < _pickupSettleUntil;
+        if (settlePickup || (!grounded && _verticalVelocity <= 0f && !overWater))
         {
             float lifted = transform.position.y - before.y;
             if (lifted > 0.001f)
                 _controller.Move(new Vector3(0f, -lifted, 0f));
         }
+        if (settlePickup && _verticalVelocity > 0f)
+            _verticalVelocity = 0f;
+        RestoreOverlapAfterPickup();
 
         UpdateFootsteps(dt, grounded, planar.magnitude);
         Vector3 worldVel = _controller.velocity;
         LocalPlanarVelocity = transform.InverseTransformDirection(new Vector3(worldVel.x, 0f, worldVel.z));
         _wasGrounded = grounded;
-        if (_rideBoat == null && !_jumpedThisAir)
+        if (!settlePickup && _rideBoat == null && !_jumpedThisAir)
             SeparateFromBoatPieces(false);
         if (!_jumpedThisAir)
             CaptureBoatFollow();
@@ -654,8 +727,11 @@ public class HorrorFirstPersonController : MonoBehaviour
             _swimVel.x = air.x;
             _swimVel.z = air.z;
             _swimVel.y = _verticalVelocity;
+            Vector3 heaveBefore = transform.position;
             _controller.Move((_swimVel + SwimCurrent()) * dt);
-            SeparateFromBoatPieces(true);
+            ClampPickupLift(heaveBefore);
+            if (Time.time >= _pickupSettleUntil)
+                SeparateFromBoatPieces(true);
             if (IsOnWalkableGround() || TryBoatDeck(out _, out _))
             {
                 IsSwimming = false;
@@ -708,8 +784,11 @@ public class HorrorFirstPersonController : MonoBehaviour
 
         _verticalVelocity = _swimVel.y;
         Vector3 swimMove = _swimVel + SwimCurrent();
+        Vector3 swimBefore = transform.position;
         _controller.Move(swimMove * dt);
-        SeparateFromBoatPieces(nearLedge);
+        ClampPickupLift(swimBefore);
+        if (Time.time >= _pickupSettleUntil)
+            SeparateFromBoatPieces(nearLedge);
         if (transform.position.y > floatFeet + 0.18f)
         {
             float pull = (transform.position.y - floatFeet) * Mathf.Min(1f, 3.2f * dt);
@@ -829,22 +908,51 @@ public class HorrorFirstPersonController : MonoBehaviour
             _controller.Move(push);
     }
 
+    Vector3 SlopeWalk(Vector3 planar, float speed)
+    {
+        if (!_onSteepTerrain)
+            return planar * speed;
+
+        Vector3 n = _groundNrm.sqrMagnitude > 0.01f ? _groundNrm.normalized : Vector3.up;
+        Vector3 along = Vector3.ProjectOnPlane(planar.sqrMagnitude > 0.0001f ? planar : Vector3.zero, n);
+        if (along.sqrMagnitude > 0.0001f)
+            along = along.normalized * speed;
+
+        float steep = Mathf.InverseLerp(10f, 50f, _slopeAngle);
+        float grade = along.sqrMagnitude > 0.0001f ? Vector3.Dot(along.normalized, Vector3.up) : 0f;
+        if (grade > 0.02f)
+            along *= Mathf.Lerp(1f, 0.16f, steep);
+        else if (grade < -0.02f)
+            along *= Mathf.Lerp(1f, 0.7f, steep);
+
+        Vector3 slide = Vector3.ProjectOnPlane(Vector3.down, n);
+        if (planar.sqrMagnitude < 0.02f && slide.sqrMagnitude > 0.0001f)
+        {
+            slide.Normalize();
+            along += slide * Mathf.Lerp(0f, 0.85f, Mathf.InverseLerp(28f, 55f, _slopeAngle));
+        }
+
+        along.y -= 2.4f;
+        return along;
+    }
+
     /// <summary>
-    /// Реально стоим на поверхности, по которой можно ходить (нормаль не круче slopeLimit).
+    /// Реально стоим на поверхности, по которой можно ходить.
     /// Стены и бока брёвен не считаются землёй — иначе прыжок рядом с домом прилипает.
+    /// Склон террейна до TerrainWalkSlope — ходим, только медленнее.
     /// </summary>
     bool IsOnWalkableGround()
     {
+        _groundNrm = Vector3.up;
+        _slopeAngle = 0f;
+        _onSteepTerrain = false;
         if (TryBoatDeck(out _, out _))
             return true;
         float radius = Mathf.Max(0.08f, _controller.radius * 0.85f);
         Vector3 center = transform.position + _controller.center;
         float toFeet = Mathf.Max(0.02f, _controller.center.y - radius);
         float maxDist = toFeet + groundProbeDistance;
-        float minY = Mathf.Cos(_controller.slopeLimit * Mathf.Deg2Rad);
 
-        // Каст из центра капсулы вниз — сфера не стартует внутри пола
-        // (иначе SphereCast пропускает уже перекрытый коллайдер).
         var hits = Physics.SphereCastAll(center, radius, Vector3.down, maxDist,
             groundMask, QueryTriggerInteraction.Ignore);
 
@@ -853,7 +961,7 @@ public class HorrorFirstPersonController : MonoBehaviour
             Transform t = hits[i].transform;
             if (t == null || t == transform || t.IsChildOf(transform))
                 continue;
-            if (!IsStandSurface(hits[i].collider, hits[i].point, hits[i].normal.y >= minY))
+            if (!AcceptStand(hits[i].collider, hits[i].point, hits[i].normal))
                 continue;
             return true;
         }
@@ -862,7 +970,7 @@ public class HorrorFirstPersonController : MonoBehaviour
                 0.55f, groundMask, QueryTriggerInteraction.Ignore))
         {
             if (ray.transform != transform && !ray.transform.IsChildOf(transform) &&
-                IsStandSurface(ray.collider, ray.point, ray.normal.y >= minY))
+                AcceptStand(ray.collider, ray.point, ray.normal))
                 return true;
         }
 
@@ -877,12 +985,28 @@ public class HorrorFirstPersonController : MonoBehaviour
             Vector3 away = feet - p;
             if (away.sqrMagnitude < 0.0001f)
                 continue;
-            bool flat = away.normalized.y >= minY;
-            if (IsStandSurface(col, p, flat))
+            if (AcceptStand(col, p, away.normalized))
                 return true;
         }
 
         return false;
+    }
+
+    bool AcceptStand(Collider col, Vector3 point, Vector3 nrm)
+    {
+        if (nrm.sqrMagnitude < 0.0001f)
+            nrm = Vector3.up;
+        nrm.Normalize();
+        bool boat = col != null && BoatPart.FromCollider(col) != null;
+        float minY = boat
+            ? Mathf.Cos(48f * Mathf.Deg2Rad)
+            : Mathf.Cos(TerrainWalkSlope * Mathf.Deg2Rad);
+        if (!IsStandSurface(col, point, nrm.y >= minY))
+            return false;
+        _groundNrm = nrm;
+        _slopeAngle = Vector3.Angle(nrm, Vector3.up);
+        _onSteepTerrain = !boat && _slopeAngle > 17f;
+        return true;
     }
 
     public bool RidesIsland(BoatPiece piece)
@@ -962,6 +1086,45 @@ public class HorrorFirstPersonController : MonoBehaviour
     public void ReleaseBoatFollow()
     {
         ClearBoatFollow();
+    }
+
+    /// <summary>
+    /// Подбор детали, на которой стоишь: не тащить игрока вместе с куском и не дать CC вытолкнуть вверх.
+    /// </summary>
+    public void SuppressPickupLaunch()
+    {
+        _jumpLift = 0f;
+        _jumpLiftVel = 0f;
+        _drownBoat = 0f;
+        ClearBoatFollow(true);
+        _offRaftUntil = Time.time + 0.28f;
+        _jumpedThisAir = false;
+        _verticalVelocity = Mathf.Min(_verticalVelocity, 0f);
+        _swimVel.y = Mathf.Min(_swimVel.y, 0f);
+        _pickupSettleUntil = Time.time + 0.38f;
+        if (_controller != null)
+            _controller.enableOverlapRecovery = false;
+    }
+
+    void ClampPickupLift(Vector3 before)
+    {
+        if (_controller == null || Time.time >= _pickupSettleUntil)
+            return;
+        float lifted = transform.position.y - before.y;
+        if (lifted > 0.001f)
+            _controller.Move(new Vector3(0f, -lifted, 0f));
+        if (_verticalVelocity > 0f)
+            _verticalVelocity = 0f;
+        _swimVel.y = Mathf.Min(_swimVel.y, 0f);
+        RestoreOverlapAfterPickup();
+    }
+
+    void RestoreOverlapAfterPickup()
+    {
+        if (_controller == null)
+            return;
+        if (Time.time >= _pickupSettleUntil && !_controller.enableOverlapRecovery)
+            _controller.enableOverlapRecovery = true;
     }
 
     const float DeckReach = 0.24f;

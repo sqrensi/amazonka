@@ -80,7 +80,7 @@ public static class BoatIsland
         if (!dirty)
         {
             if (!BoatPiece.WaterSimLive())
-                lead.RestOnShore();
+                lead.WakeForWater();
             BoatPiece.SyncCraft(island, lead);
             return;
         }
@@ -124,7 +124,7 @@ public static class BoatIsland
         if (body != null)
         {
             if (!BoatPiece.WaterSimLive())
-                lead.RestOnShore();
+                lead.WakeForWater();
             else if (!body.isKinematic)
             {
                 body.linearVelocity = lin;

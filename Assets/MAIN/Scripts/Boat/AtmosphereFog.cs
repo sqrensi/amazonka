@@ -30,12 +30,12 @@ public class AtmosphereFog : MonoBehaviour
     {
         if (UnderwaterFx.Covering)
             return;
-        if (RaceMood.FogOn)
+        if (RaceMood.Active != null)
         {
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
             RenderSettings.fogColor = RaceMood.FogColor;
-            RenderSettings.fogDensity = RaceMood.FogDensity;
+            RenderSettings.fogDensity = Mathf.Max(0.00012f, RaceMood.FogDensity);
             return;
         }
         RenderSettings.fog = false;

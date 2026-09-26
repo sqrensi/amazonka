@@ -217,12 +217,9 @@ public class BoatMaterialItem : HeldItem
 
     void Place(Vector3 pos, Quaternion rot)
     {
-        if (_ghost != null && _ghost.activeInHierarchy)
-        {
-            pos = _ghost.transform.position;
-            rot = _ghost.transform.rotation;
-        }
         BoatBuildHud.Clear();
+        BoatVisuals.PlaceBox(kind, WorldSize, out Vector3 center, out Vector3 box);
+        BoatBuildUtil.RememberPlaceY(pos, rot, center, box);
         ClearGhost();
         var support = BoatBuildUtil.Aim(Owner, 6f, out RaycastHit hit)
             ? hit.collider

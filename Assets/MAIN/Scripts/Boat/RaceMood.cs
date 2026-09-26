@@ -2,12 +2,36 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 /// <summary>
-/// Настроение заезда от RoundSeed: сезон, погода, течение, лёгкий tint воды и грунта.
+/// Настроение заезда от RoundSeed. Сезон на раунд один; небо, туман, дождь и время суток
+/// едут плавно внутри раунда по тому же сиду.
 /// </summary>
+[DefaultExecutionOrder(-20)]
 public class RaceMood : MonoBehaviour
 {
     public enum Season { Spring, Summer, Autumn, Winter }
     public enum Sky { Clear, Overcast, Fog, Rain, Storm, Snow }
+
+    struct Look
+    {
+        public Season season;
+        public Sky sky;
+        public Color grade;
+        public float snow;
+        public float rain;
+        public float fogDensity;
+        public Color fogColor;
+        public float exposure;
+        public float contrast;
+        public float sat;
+        public float temp;
+        public float tint;
+        public float sunMul;
+        public Color sunCol;
+        public Vector3 sunEuler;
+        public float current;
+        public Color waterDeep;
+        public Color waterShallow;
+    }
 
     public static RaceMood Active { get; private set; }
     public static Season RoundSeason { get; private set; } = Season.Summer;
@@ -21,11 +45,29 @@ public class RaceMood : MonoBehaviour
     float _sunInt;
     Quaternion _sunRot;
     Color _ambient;
-    Color _sky;
     bool _litSaved;
     ParticleSystem _precip;
+    bool _precipSnow;
     Color _waterDeep = new Color(0.15f, 0.21f, 0.34f, 0.96f);
     Color _waterShallow = new Color(0.1f, 0.28f, 0.46f, 0.11f);
+
+    bool _live;
+    float _day;
+    float _dayVel;
+    float _baseCurrent;
+    Look _from;
+    Look _to;
+    float _blend;
+    float _blendDur;
+    float _hold;
+    int _beat;
+    System.Random _weatherRng;
+    float _waterPaintAt;
+    float _gradeAt;
+    float _fogLive;
+    Color _fogColLive;
+    float _rainLive;
+    float _snowLive;
 
     static readonly int WaterDeepId = Shader.PropertyToID("Color_36218622185947c6a5ae36366d8e21d8");
     static readonly int WaterShallowId = Shader.PropertyToID("Color_93e06cd551a5449091bcde90b46765a0");
@@ -42,16 +84,22 @@ public class RaceMood : MonoBehaviour
 
     public static void ApplyRound(int seed)
     {
-        var host = Object.FindFirstObjectByType<BoatRaceMode>();
-        RaceMood mood = host != null ? host.GetComponent<RaceMood>() : null;
-        if (mood == null && host != null)
-            mood = host.gameObject.AddComponent<RaceMood>();
-        if (mood == null)
+        try
         {
-            var go = new GameObject("RaceMood");
-            mood = go.AddComponent<RaceMood>();
+            RaceMood mood = Active;
+            if (mood == null)
+                mood = Object.FindFirstObjectByType<RaceMood>();
+            if (mood == null)
+            {
+                var go = new GameObject("RaceMood");
+                mood = go.AddComponent<RaceMood>();
+            }
+            mood.Roll(seed);
         }
-        mood.Roll(seed);
+        catch (System.Exception e)
+        {
+            Debug.LogWarning("[RaceMood] " + e.Message);
+        }
     }
 
     void OnEnable()
@@ -70,129 +118,321 @@ public class RaceMood : MonoBehaviour
     {
         var rng = new System.Random(unchecked(seed * 7919 + 31));
         RoundSeason = (Season)rng.Next(0, 4);
-        RoundSky = PickSky(RoundSeason, rng);
         CaptureLight();
-        float current = RollCurrent(RoundSeason, rng);
-        BoatCurrentPath.SetRoundSpeed(current);
+        BindTerrainLayers();
+        _baseCurrent = RollCurrent(RoundSeason, rng);
+        _day = Mathf.Lerp(0.14f, 0.5f, (float)rng.NextDouble());
+        _dayVel = Mathf.Lerp(0.07f, 0.15f, (float)rng.NextDouble()) / 60f;
+        _weatherRng = new System.Random(unchecked(seed * 104729 + 17));
+        _beat = 0;
+        _from = BuildLook(RoundSeason, PickSky(RoundSeason, rng), _day, _baseCurrent);
+        _to = _from;
+        _blend = 1f;
+        _blendDur = 1f;
+        _hold = 0f;
+        _fogLive = _from.fogDensity;
+        _fogColLive = _from.fogColor;
+        _rainLive = _from.rain;
+        _snowLive = _from.snow;
+        ApplyLook(_from, true);
+        QueueHold();
+        _to = NextLook();
+        _live = true;
+    }
 
-        Color grade = Color.white;
-        float snow = 0f;
-        float rain = 0f;
-        FogDensity = 0f;
-        FogColor = new Color(0.74f, 0.80f, 0.84f);
-        float exposure = 0.62f;
-        float contrast = 10f;
-        float sat = 18f;
-        float temp = 6f;
-        float tint = -1f;
-        float sunMul = 1f;
-        Color sunCol = new Color(1f, 0.91f, 0.65f);
-        Vector3 sunEuler = new Vector3(38f, 160f, 0f);
+    void Update()
+    {
+        if (!_live || _weatherRng == null)
+            return;
+        try
+        {
+        float dt = Time.unscaledDeltaTime;
+        _day = Mathf.Min(0.92f, _day + _dayVel * dt);
+        Look goal;
+        if (_hold > 0f)
+        {
+            _hold -= dt;
+            goal = WithDay(_from, _day);
+        }
+        else
+        {
+            _blend += dt;
+            float u = _blendDur <= 1f ? 1f : Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(_blend / _blendDur));
+            goal = LerpLook(_from, WithDay(_to, _day), u);
+            goal.sunEuler = DaySun(_day);
+            if (u >= 1f)
+            {
+                _from = WithDay(_to, _day);
+                _to = NextLook();
+                QueueHold();
+                _blend = 0f;
+            }
+        }
+        ApplyLook(goal, false);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning("[RaceMood] tick " + e.Message);
+            _live = false;
+        }
+    }
 
-        switch (RoundSeason)
+    void QueueHold()
+    {
+        _hold = Mathf.Lerp(18f, 48f, (float)_weatherRng.NextDouble());
+        _blendDur = Mathf.Lerp(48f, 95f, (float)_weatherRng.NextDouble());
+    }
+
+    Look NextLook()
+    {
+        _beat++;
+        Sky sky = StepSky(_from.sky, RoundSeason, _weatherRng);
+        return BuildLook(RoundSeason, sky, _day, _baseCurrent);
+    }
+
+    static Sky StepSky(Sky from, Season season, System.Random rng)
+    {
+        Sky[] chain = season == Season.Winter
+            ? new[] { Sky.Clear, Sky.Overcast, Sky.Fog, Sky.Snow }
+            : new[] { Sky.Clear, Sky.Overcast, Sky.Fog, Sky.Rain, Sky.Storm };
+        int i = 0;
+        for (int n = 0; n < chain.Length; n++)
+        {
+            if (chain[n] == from)
+            {
+                i = n;
+                break;
+            }
+        }
+        int step = rng.Next(0, 100) < 22 ? 0 : (rng.Next(0, 2) == 0 ? -1 : 1);
+        if (step == 0)
+            step = rng.Next(0, 2) == 0 ? -1 : 1;
+        i = Mathf.Clamp(i + step, 0, chain.Length - 1);
+        return chain[i];
+    }
+
+    static Look WithDay(Look look, float day)
+    {
+        look.sunEuler = DaySun(day);
+        Color heat = DaySunColor(day);
+        look.sunCol = Color.Lerp(look.sunCol, heat, 0.55f);
+        look.temp += (day - 0.45f) * 10f;
+        return look;
+    }
+
+    static Vector3 DaySun(float day)
+    {
+        float t = Mathf.Clamp01(day);
+        float pitch = Mathf.Lerp(7f, 56f, Mathf.Sin(t * Mathf.PI));
+        float yaw = Mathf.Lerp(98f, 238f, t);
+        return new Vector3(pitch, yaw, 0f);
+    }
+
+    static Color DaySunColor(float day)
+    {
+        float t = Mathf.Clamp01(day);
+        Color dawn = new Color(1f, 0.72f, 0.48f);
+        Color noon = new Color(1f, 0.94f, 0.78f);
+        Color dusk = new Color(1f, 0.52f, 0.28f);
+        if (t < 0.5f)
+            return Color.Lerp(dawn, noon, t * 2f);
+        return Color.Lerp(noon, dusk, (t - 0.5f) * 2f);
+    }
+
+    static Look BuildLook(Season season, Sky sky, float day, float current)
+    {
+        var look = new Look
+        {
+            season = season,
+            sky = sky,
+            grade = Color.white,
+            snow = 0f,
+            rain = 0f,
+            fogDensity = 0f,
+            fogColor = new Color(0.74f, 0.80f, 0.84f),
+            exposure = 0.62f,
+            contrast = 10f,
+            sat = 18f,
+            temp = 6f,
+            tint = -1f,
+            sunMul = 1f,
+            sunCol = new Color(1f, 0.91f, 0.65f),
+            sunEuler = DaySun(day),
+            current = current,
+            waterDeep = new Color(0.15f, 0.21f, 0.34f, 0.96f),
+            waterShallow = new Color(0.1f, 0.28f, 0.46f, 0.11f)
+        };
+
+        switch (season)
         {
             case Season.Spring:
-                grade = new Color(0.92f, 1.02f, 0.9f);
-                sat = 20f;
-                temp = 2f;
-                current *= 1.02f;
-                _waterDeep = new Color(0.14f, 0.24f, 0.34f, 0.96f);
-                _waterShallow = new Color(0.12f, 0.32f, 0.44f, 0.12f);
+                look.grade = new Color(0.92f, 1.02f, 0.9f);
+                look.sat = 20f;
+                look.temp = 2f;
+                look.current *= 1.02f;
+                look.waterDeep = new Color(0.14f, 0.24f, 0.34f, 0.96f);
+                look.waterShallow = new Color(0.12f, 0.32f, 0.44f, 0.12f);
                 break;
             case Season.Summer:
-                grade = new Color(1.04f, 1.01f, 0.9f);
-                sat = 22f;
-                temp = 10f;
-                exposure = 0.7f;
-                sunMul = 1.12f;
-                sunEuler = new Vector3(52f, 148f, 0f);
-                _waterDeep = new Color(0.13f, 0.22f, 0.36f, 0.96f);
-                _waterShallow = new Color(0.1f, 0.3f, 0.48f, 0.11f);
+                look.grade = new Color(1.04f, 1.01f, 0.9f);
+                look.sat = 22f;
+                look.temp = 10f;
+                look.exposure = 0.7f;
+                look.sunMul = 1.12f;
+                look.waterDeep = new Color(0.13f, 0.22f, 0.36f, 0.96f);
+                look.waterShallow = new Color(0.1f, 0.3f, 0.48f, 0.11f);
                 break;
             case Season.Autumn:
-                grade = new Color(1.08f, 0.86f, 0.62f);
-                sat = 16f;
-                temp = 14f;
-                contrast = 12f;
-                sunCol = new Color(1f, 0.78f, 0.48f);
-                sunMul = 0.88f;
-                sunEuler = new Vector3(28f, 172f, 0f);
-                _waterDeep = new Color(0.16f, 0.2f, 0.28f, 0.96f);
-                _waterShallow = new Color(0.14f, 0.26f, 0.36f, 0.12f);
+                look.grade = new Color(1.08f, 0.86f, 0.62f);
+                look.sat = 16f;
+                look.temp = 14f;
+                look.contrast = 12f;
+                look.sunCol = new Color(1f, 0.78f, 0.48f);
+                look.sunMul = 0.88f;
+                look.waterDeep = new Color(0.16f, 0.2f, 0.28f, 0.96f);
+                look.waterShallow = new Color(0.14f, 0.26f, 0.36f, 0.12f);
                 break;
             default:
-                grade = new Color(0.92f, 0.96f, 1.04f);
-                snow = 0.72f;
-                sat = 8f;
-                temp = -6f;
-                exposure = 0.78f;
-                contrast = 8f;
-                sunCol = new Color(0.82f, 0.9f, 1f);
-                sunMul = 0.78f;
-                sunEuler = new Vector3(24f, 155f, 0f);
-                FogColor = new Color(0.82f, 0.88f, 0.92f);
-                _waterDeep = new Color(0.16f, 0.22f, 0.3f, 0.96f);
-                _waterShallow = new Color(0.18f, 0.28f, 0.36f, 0.14f);
+                look.grade = new Color(0.92f, 0.96f, 1.04f);
+                look.snow = 0.72f;
+                look.sat = 8f;
+                look.temp = -6f;
+                look.exposure = 0.78f;
+                look.contrast = 8f;
+                look.sunCol = new Color(0.82f, 0.9f, 1f);
+                look.sunMul = 0.78f;
+                look.fogColor = new Color(0.82f, 0.88f, 0.92f);
+                look.waterDeep = new Color(0.16f, 0.22f, 0.3f, 0.96f);
+                look.waterShallow = new Color(0.18f, 0.28f, 0.36f, 0.14f);
                 break;
         }
 
-        switch (RoundSky)
+        switch (sky)
         {
             case Sky.Clear:
                 break;
             case Sky.Overcast:
-                sunMul *= 0.55f;
-                exposure -= 0.12f;
-                sat -= 4f;
-                FogDensity = 0.004f;
-                FogColor = Color.Lerp(FogColor, new Color(0.62f, 0.66f, 0.7f), 0.45f);
+                look.sunMul *= 0.55f;
+                look.exposure -= 0.12f;
+                look.sat -= 4f;
+                look.fogDensity = 0.004f;
+                look.fogColor = Color.Lerp(look.fogColor, new Color(0.62f, 0.66f, 0.7f), 0.45f);
                 break;
             case Sky.Fog:
-                sunMul *= 0.42f;
-                FogDensity = 0.018f;
-                FogColor = Color.Lerp(FogColor, new Color(0.7f, 0.76f, 0.78f), 0.5f);
-                exposure -= 0.08f;
-                sat -= 6f;
+                look.sunMul *= 0.42f;
+                look.fogDensity = 0.018f;
+                look.fogColor = Color.Lerp(look.fogColor, new Color(0.7f, 0.76f, 0.78f), 0.5f);
+                look.exposure -= 0.08f;
+                look.sat -= 6f;
                 break;
             case Sky.Rain:
-                rain = 1f;
-                sunMul *= 0.4f;
-                FogDensity = 0.009f;
-                FogColor = new Color(0.55f, 0.6f, 0.64f);
-                exposure -= 0.16f;
-                sat -= 8f;
-                temp -= 4f;
+                look.rain = 1f;
+                look.sunMul *= 0.4f;
+                look.fogDensity = 0.009f;
+                look.fogColor = new Color(0.55f, 0.6f, 0.64f);
+                look.exposure -= 0.16f;
+                look.sat -= 8f;
+                look.temp -= 4f;
+                look.current *= 1.06f;
                 break;
             case Sky.Storm:
-                rain = 1.35f;
-                sunMul *= 0.28f;
-                FogDensity = 0.014f;
-                FogColor = new Color(0.42f, 0.46f, 0.5f);
-                exposure -= 0.22f;
-                contrast += 4f;
-                sat -= 10f;
-                sunCol = new Color(0.7f, 0.76f, 0.82f);
+                look.rain = 1.35f;
+                look.sunMul *= 0.28f;
+                look.fogDensity = 0.014f;
+                look.fogColor = new Color(0.42f, 0.46f, 0.5f);
+                look.exposure -= 0.22f;
+                look.contrast += 4f;
+                look.sat -= 10f;
+                look.sunCol = new Color(0.7f, 0.76f, 0.82f);
+                look.current *= 1.1f;
                 break;
             case Sky.Snow:
-                snow = Mathf.Max(snow, 0.82f);
-                rain = 0f;
-                FogDensity = Mathf.Max(FogDensity, 0.011f);
-                FogColor = new Color(0.86f, 0.9f, 0.94f);
-                sunMul *= 0.62f;
+                look.snow = Mathf.Max(look.snow, 0.82f);
+                look.rain = 0f;
+                look.fogDensity = Mathf.Max(look.fogDensity, 0.011f);
+                look.fogColor = new Color(0.86f, 0.9f, 0.94f);
+                look.sunMul *= 0.62f;
                 break;
         }
 
-        BoatCurrentPath.SetRoundSpeed(current);
-        ApplySun(sunCol, sunMul, sunEuler);
-        ApplyGrade(exposure, contrast, sat, temp, tint);
-        BindTerrainLayers();
-        TintTerrain(grade, snow);
-        TintWater();
-        BuildPrecip(RoundSky == Sky.Snow || RoundSeason == Season.Winter, rain, snow);
-        RenderSettings.fog = FogOn;
-        RenderSettings.fogMode = FogMode.ExponentialSquared;
-        RenderSettings.fogColor = FogColor;
-        RenderSettings.fogDensity = FogDensity;
+        look.sunEuler = DaySun(day);
+        look.sunCol = Color.Lerp(look.sunCol, DaySunColor(day), 0.55f);
+        return look;
+    }
+
+    static Look LerpLook(Look a, Look b, float t)
+    {
+        t = Mathf.Clamp01(t);
+        return new Look
+        {
+            season = t < 0.5f ? a.season : b.season,
+            sky = t < 0.5f ? a.sky : b.sky,
+            grade = Color.Lerp(a.grade, b.grade, t),
+            snow = Mathf.Lerp(a.snow, b.snow, t),
+            rain = Mathf.Lerp(a.rain, b.rain, t),
+            fogDensity = Mathf.Lerp(a.fogDensity, b.fogDensity, t),
+            fogColor = Color.Lerp(a.fogColor, b.fogColor, t),
+            exposure = Mathf.Lerp(a.exposure, b.exposure, t),
+            contrast = Mathf.Lerp(a.contrast, b.contrast, t),
+            sat = Mathf.Lerp(a.sat, b.sat, t),
+            temp = Mathf.Lerp(a.temp, b.temp, t),
+            tint = Mathf.Lerp(a.tint, b.tint, t),
+            sunMul = Mathf.Lerp(a.sunMul, b.sunMul, t),
+            sunCol = Color.Lerp(a.sunCol, b.sunCol, t),
+            sunEuler = Quaternion.Slerp(Quaternion.Euler(a.sunEuler), Quaternion.Euler(b.sunEuler), t).eulerAngles,
+            current = Mathf.Lerp(a.current, b.current, t),
+            waterDeep = Color.Lerp(a.waterDeep, b.waterDeep, t),
+            waterShallow = Color.Lerp(a.waterShallow, b.waterShallow, t)
+        };
+    }
+
+    void ApplyLook(Look look, bool force)
+    {
+        RoundSeason = look.season;
+        RoundSky = look.sky;
+        float dt = Time.unscaledDeltaTime;
+        if (force)
+        {
+            _fogLive = look.fogDensity;
+            _fogColLive = look.fogColor;
+            _rainLive = look.rain;
+            _snowLive = look.snow;
+        }
+        else
+        {
+            float k = 1f - Mathf.Exp(-dt * 0.28f);
+            _fogLive = Mathf.Lerp(_fogLive, look.fogDensity, k);
+            _fogColLive = Color.Lerp(_fogColLive, look.fogColor, k);
+            _rainLive = Mathf.Lerp(_rainLive, look.rain, k);
+            _snowLive = Mathf.Lerp(_snowLive, look.snow, k);
+        }
+        FogDensity = _fogLive;
+        FogColor = _fogColLive;
+        float k = force ? 1f : 1f - Mathf.Exp(-dt * 0.38f);
+        _waterDeep = Color.Lerp(_waterDeep, look.waterDeep, k);
+        _waterShallow = Color.Lerp(_waterShallow, look.waterShallow, k);
+        BoatCurrentPath.SetRoundSpeed(look.current);
+        ApplySun(look.sunCol, look.sunMul, look.sunEuler, force);
+        float now = Time.unscaledTime;
+        if (force || now >= _gradeAt)
+        {
+            ApplyGrade(look.exposure, look.contrast, look.sat, look.temp, look.tint, force);
+            TintTerrain(look.grade, look.snow, force);
+            _gradeAt = now + 0.05f;
+        }
+        if (force || now >= _waterPaintAt)
+        {
+            TintWater();
+            _waterPaintAt = now + 0.2f;
+        }
+        SetPrecip(_rainLive, _snowLive);
+        if (!UnderwaterFx.Covering)
+        {
+            RenderSettings.fog = true;
+            RenderSettings.fogMode = FogMode.ExponentialSquared;
+            RenderSettings.fogColor = FogColor;
+            RenderSettings.fogDensity = Mathf.Max(0.00012f, FogDensity);
+        }
         if (_sun != null)
             RenderSettings.sun = _sun;
     }
@@ -250,34 +490,45 @@ public class RaceMood : MonoBehaviour
             _sunRot = _sun.transform.rotation;
         }
         _ambient = RenderSettings.ambientLight;
-        _sky = RenderSettings.skybox != null ? Color.white : RenderSettings.ambientSkyColor;
         _litSaved = true;
     }
 
-    void ApplySun(Color col, float mul, Vector3 euler)
+    void ApplySun(Color col, float mul, Vector3 euler, bool force)
     {
         if (_sun == null)
             return;
-        _sun.color = col;
-        _sun.intensity = Mathf.Clamp(_sunInt * mul, 0.25f, 2.4f);
-        _sun.transform.rotation = Quaternion.Euler(euler);
-        RenderSettings.ambientLight = Color.Lerp(_ambient, col, 0.18f) * Mathf.Lerp(0.7f, 1.05f, mul);
+        Quaternion want = Quaternion.Euler(euler);
+        float wantInt = Mathf.Clamp(_sunInt * mul, 0.25f, 2.4f);
+        float k = force ? 1f : 1f - Mathf.Exp(-Time.unscaledDeltaTime * 0.42f);
+        _sun.color = Color.Lerp(_sun.color, col, k);
+        _sun.intensity = Mathf.Lerp(_sun.intensity, wantInt, k);
+        _sun.transform.rotation = Quaternion.Slerp(_sun.transform.rotation, want, k);
+        RenderSettings.ambientLight = Color.Lerp(
+            RenderSettings.ambientLight,
+            Color.Lerp(_ambient, col, 0.18f) * Mathf.Lerp(0.7f, 1.05f, mul),
+            k);
     }
 
-    void ApplyGrade(float exposure, float contrast, float sat, float temp, float tint)
+    void ApplyGrade(float exposure, float contrast, float sat, float temp, float tint, bool force)
     {
         var look = Object.FindFirstObjectByType<GameLook>();
         if (look != null)
-            look.SetRound(exposure, contrast, sat, temp, tint);
+            look.SetRound(exposure, contrast, sat, temp, tint, force);
     }
 
-    void TintTerrain(Color mul, float snow)
+    Color _gradeLive = Color.white;
+
+    void TintTerrain(Color mul, float snow, bool force)
     {
         Color c = Color.Lerp(mul, new Color(0.86f, 0.9f, 0.96f), snow);
+        if (force)
+            _gradeLive = c;
+        else
+            _gradeLive = Color.Lerp(_gradeLive, c, 1f - Mathf.Exp(-Time.unscaledDeltaTime * 0.35f));
         Shader.SetGlobalColor(TerrainTintId, new Color(
-            Mathf.Clamp(c.r, 0.55f, 1.25f),
-            Mathf.Clamp(c.g, 0.55f, 1.25f),
-            Mathf.Clamp(c.b, 0.55f, 1.25f),
+            Mathf.Clamp(_gradeLive.r, 0.55f, 1.25f),
+            Mathf.Clamp(_gradeLive.g, 0.55f, 1.25f),
+            Mathf.Clamp(_gradeLive.b, 0.55f, 1.25f),
             1f));
     }
 
@@ -340,18 +591,44 @@ public class RaceMood : MonoBehaviour
         }
     }
 
-    void BuildPrecip(bool snow, float rain, float snowAmt)
+    void SetPrecip(float rain, float snow)
+    {
+        bool wantSnow = snow > 0.4f && rain < 0.35f;
+        bool wantRain = rain > 0.06f && !wantSnow;
+        if (!wantRain && !wantSnow)
+        {
+            if (_precip != null)
+            {
+                var emOff = _precip.emission;
+                emOff.rateOverTime = 0f;
+            }
+            return;
+        }
+        if (_precip == null || _precipSnow != wantSnow)
+            BuildPrecip(wantSnow);
+        if (_precip == null)
+            return;
+        var em = _precip.emission;
+        em.rateOverTime = wantSnow ? 28f + snow * 18f : 55f * rain;
+        var cam = Camera.main;
+        if (cam != null && _precip.transform.parent != cam.transform)
+        {
+            _precip.transform.SetParent(cam.transform, false);
+            _precip.transform.localPosition = new Vector3(0f, 4.5f, 3.5f);
+        }
+    }
+
+    void BuildPrecip(bool snow)
     {
         if (_precip != null)
             Destroy(_precip.gameObject);
-        if (rain < 0.05f && !snow)
-            return;
         var cam = Camera.main;
         var go = new GameObject(snow ? "SnowFx" : "RainFx");
         if (cam != null)
             go.transform.SetParent(cam.transform, false);
         go.transform.localPosition = new Vector3(0f, 4.5f, 3.5f);
         _precip = go.AddComponent<ParticleSystem>();
+        _precipSnow = snow;
         var main = _precip.main;
         main.loop = true;
         main.playOnAwake = true;
@@ -363,7 +640,7 @@ public class RaceMood : MonoBehaviour
         main.startColor = snow ? new Color(0.92f, 0.95f, 1f, 0.7f) : new Color(0.65f, 0.72f, 0.8f, 0.35f);
         main.gravityModifier = snow ? 0.08f : 1.6f;
         var em = _precip.emission;
-        em.rateOverTime = snow ? 28f + snowAmt * 18f : 55f * rain;
+        em.rateOverTime = snow ? 28f : 55f;
         var sh = _precip.shape;
         sh.shapeType = ParticleSystemShapeType.Box;
         sh.scale = new Vector3(14f, 6f, 14f);
@@ -387,6 +664,7 @@ public class RaceMood : MonoBehaviour
 
     void Restore()
     {
+        _live = false;
         Shader.SetGlobalColor(TerrainTintId, Color.white);
         if (_litSaved && _sun != null)
         {

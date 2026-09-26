@@ -130,7 +130,7 @@ static class HorrorPlayerPrefabBuilder
         controller.height = 1.8f;
         controller.radius = 0.32f;
         controller.center = new Vector3(0f, 0.9f, 0f);
-        controller.slopeLimit = 45f;
+        controller.slopeLimit = 68f;
         controller.stepOffset = 0.3f;
         controller.skinWidth = 0.08f;
         controller.minMoveDistance = 0.001f;
