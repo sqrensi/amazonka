@@ -15,6 +15,11 @@ public class HouseBombBird : MonoBehaviour, IDamageable
     bool _dropped;
     float _dropAt;
     Vector3 _dropPos;
+    bool _circling;
+    float _orbitAng;
+    float _circleLeft;
+    int _eggsLeft;
+    int _dropsDone;
     bool _dead;
     float _hp = Hp;
     Vector3 _pos;
@@ -25,10 +30,11 @@ public class HouseBombBird : MonoBehaviour, IDamageable
     float _yaw;
     float _pitch;
     float _roll;
-    int _dropN = 2;
     Renderer[] _rends;
     Color[] _baseColors;
     float _flashUntil;
+
+    bool _trackCraft;
 
     public bool IsDead => _dead;
 
@@ -36,27 +42,39 @@ public class HouseBombBird : MonoBehaviour, IDamageable
     {
         var go = new GameObject("BombBird");
         var bird = go.AddComponent<HouseBombBird>();
-        bird.Begin(house);
+        bird.Begin(house, false);
         return bird;
     }
 
-    void Begin(Vector3 house)
+    public static HouseBombBird SpawnOnBoat(BoatPiece craft)
     {
+        Vector3 origin = craft != null ? craft.transform.position : Vector3.zero;
+        var go = new GameObject("BombBird");
+        var bird = go.AddComponent<HouseBombBird>();
+        bird.Begin(origin, true);
+        return bird;
+    }
+
+    void Begin(Vector3 house, bool trackCraft)
+    {
+        _trackCraft = trackCraft;
         _house = house;
         Vector2 ring = Random.insideUnitCircle.normalized;
         if (ring.sqrMagnitude < 0.01f)
             ring = Vector2.right;
-        _start = house + new Vector3(ring.x, 0f, ring.y) * Random.Range(78f, 110f);
-        _start.y = house.y + Random.Range(20f, 28f);
+        _start = house + new Vector3(ring.x, 0f, ring.y) * Random.Range(trackCraft ? 52f : 78f, trackCraft ? 78f : 110f);
+        _start.y = house.y + Random.Range(trackCraft ? 16f : 20f, trackCraft ? 22f : 28f);
         _passDir = (house - _start);
         _passDir.y = 0f;
         if (_passDir.sqrMagnitude < 0.01f)
             _passDir = Vector3.forward;
         _passDir.Normalize();
         _yaw = Mathf.Atan2(_passDir.x, _passDir.z) * Mathf.Rad2Deg;
-        _dur = Random.Range(12f, 16f);
-        _dropN = Random.Range(1, 5);
+        _dur = Random.Range(trackCraft ? 9f : 12f, trackCraft ? 12.5f : 16f);
+        _eggsLeft = Random.Range(1, 5);
+        _dropsDone = 0;
         _pos = _start;
+        _vel = _passDir * 14f;
         transform.position = _start;
         transform.rotation = Quaternion.Euler(0f, _yaw, 0f);
         BuildVisual();
@@ -88,8 +106,8 @@ public class HouseBombBird : MonoBehaviour, IDamageable
             float want = 1.55f;
             vis.localScale = vis.localScale * (want / span);
             vis.localPosition = -b.center * (want / span);
-            if (b.size.x > b.size.z * 1.15f)
-                _faceFix = Quaternion.Euler(0f, 90f, 0f);
+            if (b.size.x > b.size.z * 1.08f)
+                _faceFix = Quaternion.Euler(0f, -90f, 0f);
             else
                 _faceFix = Quaternion.identity;
         }
@@ -132,6 +150,10 @@ public class HouseBombBird : MonoBehaviour, IDamageable
                 {
                     string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guids[i]);
                     if (string.IsNullOrEmpty(path) || path.EndsWith(".meta"))
+                        continue;
+                    string n = path.Replace('\\', '/');
+                    if (n.IndexOf("WFX", System.StringComparison.OrdinalIgnoreCase) >= 0
+                        || n.IndexOf("Explosion", System.StringComparison.OrdinalIgnoreCase) >= 0)
                         continue;
                     var go = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(path);
                     if (go != null)
@@ -221,12 +243,20 @@ public class HouseBombBird : MonoBehaviour, IDamageable
         float dt = Time.deltaTime;
         _t += dt;
         float u = Mathf.Clamp01(_t / _dur);
-        Vector3 house = HouseBuildMode.Current != null ? HouseBuildMode.Current.HoldOrigin : _house;
-        Vector3 cruise = house + Vector3.up * 18f - _passDir * 14f;
-        Vector3 over = house + Vector3.up * 7.4f;
-        Vector3 exit = house + _passDir * 130f + Vector3.up * 36f;
+        Vector3 aim = AimPoint(out Vector3 aimVel);
+        if (!_dropped && !_circling)
+        {
+            Vector3 to = aim - _pos;
+            to.y = 0f;
+            if (to.sqrMagnitude > 0.04f)
+                _passDir = to.normalized;
+        }
+        Vector3 cruise = aim + Vector3.up * 18f - _passDir * 14f;
+        Vector3 over = aim + Vector3.up * (_trackCraft ? 8.2f : 7.4f);
+        Vector3 exit = aim + _passDir * 130f + Vector3.up * 36f;
         Vector3 want;
         Vector3 tangent;
+        bool high = _dropped || _circling;
         if (_dropped)
         {
             float s = Smooth(Mathf.Clamp01((_t - _dropAt) / 5.8f));
@@ -234,6 +264,19 @@ public class HouseBombBird : MonoBehaviour, IDamageable
             tangent = exit - _dropPos;
             if (tangent.sqrMagnitude < 0.01f)
                 tangent = _passDir + Vector3.up * 0.18f;
+        }
+        else if (_circling)
+        {
+            _circleLeft -= dt;
+            float r = _trackCraft ? 11.5f : 10.2f;
+            float spin = _trackCraft ? 0.62f : 0.55f;
+            _orbitAng += dt * spin;
+            Vector3 radial = new Vector3(Mathf.Sin(_orbitAng), 0f, Mathf.Cos(_orbitAng));
+            want = aim + radial * r + Vector3.up * (_trackCraft ? 8.8f : 8.4f);
+            want.y += Mathf.Sin(_t * 2.4f) * 0.45f;
+            tangent = new Vector3(radial.z, 0.08f, -radial.x);
+            if (aimVel.sqrMagnitude > 0.04f)
+                want += Vector3.ProjectOnPlane(aimVel, Vector3.up) * 0.28f;
         }
         else if (u < 0.5f)
         {
@@ -254,37 +297,50 @@ public class HouseBombBird : MonoBehaviour, IDamageable
             tangent = exit - over;
         }
 
-        float floor = TerrainClearance(want, _dropped);
+        float floor = TerrainClearance(want, high);
         want.y = Mathf.Max(want.y, floor);
-        float chase = _dropped ? 5.4f : 3.1f;
+        if (!_dropped)
+            want.y += Mathf.Sin(_t * 2.15f) * 0.38f;
+        float chase = _dropped ? 2.6f : (_circling ? 2.2f : (_trackCraft ? 1.85f : 1.55f));
         Vector3 next = Vector3.Lerp(_pos, want, 1f - Mathf.Exp(-chase * dt));
-        next.y = Mathf.Max(next.y, TerrainClearance(next, _dropped));
-        _vel = (next - _pos) / Mathf.Max(dt, 0.0001f);
+        next.y = Mathf.Max(next.y, TerrainClearance(next, high));
+        _vel = Vector3.Lerp(_vel, (next - _pos) / Mathf.Max(dt, 0.0001f), 1f - Mathf.Exp(-4.2f * dt));
         _pos = next;
         transform.position = _pos;
 
-        if (tangent.sqrMagnitude < 0.01f)
-            tangent = _passDir;
-        Vector3 flat = new Vector3(tangent.x, 0f, tangent.z);
+        Vector3 fly = _vel;
+        fly.y *= 0.45f;
+        if (fly.sqrMagnitude < 0.04f)
+            fly = tangent.sqrMagnitude > 0.01f ? tangent : _passDir;
+        Vector3 flat = new Vector3(fly.x, 0f, fly.z);
         if (flat.sqrMagnitude < 0.0001f)
             flat = _passDir;
         flat.Normalize();
         float wantYaw = Mathf.Atan2(flat.x, flat.z) * Mathf.Rad2Deg;
-        _yaw = Mathf.LerpAngle(_yaw, wantYaw, 1f - Mathf.Exp(-3.4f * dt));
-        Vector3 tn = tangent.normalized;
-        float wantPitch = Mathf.Clamp(-Mathf.Asin(Mathf.Clamp(tn.y, -0.42f, 0.42f)) * Mathf.Rad2Deg, _dropped ? -26f : -20f, 14f);
-        _pitch = Mathf.Lerp(_pitch, wantPitch, 1f - Mathf.Exp(-2.8f * dt));
+        _yaw = Mathf.LerpAngle(_yaw, wantYaw, 1f - Mathf.Exp(-1.55f * dt));
+        Vector3 tn = fly.normalized;
+        float wantPitch = Mathf.Clamp(-Mathf.Asin(Mathf.Clamp(tn.y, -0.38f, 0.32f)) * Mathf.Rad2Deg,
+            _dropped ? -18f : (_circling ? -6f : -14f), 10f);
+        _pitch = Mathf.Lerp(_pitch, wantPitch, 1f - Mathf.Exp(-1.7f * dt));
         float turn = Mathf.DeltaAngle(_yaw, wantYaw);
-        _roll = Mathf.Lerp(_roll, Mathf.Clamp(-turn * 0.28f, -18f, 18f), 1f - Mathf.Exp(-3.6f * dt));
+        float bank = Mathf.Clamp(-turn * 0.55f, -22f, 22f) + Mathf.Sin(_t * 8.4f) * 2.4f;
+        _roll = Mathf.Lerp(_roll, bank, 1f - Mathf.Exp(-2.1f * dt));
         transform.rotation = Quaternion.Euler(_pitch, _yaw, _roll) * _faceFix;
 
-        float planar = Vector2.Distance(new Vector2(_pos.x, _pos.z), new Vector2(house.x, house.z));
-        if (!_dropped && planar < 5.2f && u > 0.42f)
-            DropEggs();
+        Vector3 pred = aim + aimVel * (_trackCraft ? 0.9f : 0f);
+        float planar = Vector2.Distance(new Vector2(_pos.x, _pos.z), new Vector2(pred.x, pred.z));
+        float reach = _trackCraft ? 7.4f : 5.2f;
+        if (!_dropped && _eggsLeft > 0)
+        {
+            bool first = _dropsDone == 0 && !_circling && planar < reach && u > 0.38f;
+            bool nextEgg = _circling && _circleLeft <= 0f && planar < reach + 3.2f;
+            if (first || nextEgg)
+                DropOne();
+        }
 
         if (_dropped && _t - _dropAt > 7.5f)
             Destroy(gameObject);
-        else if (!_dropped && u >= 1f)
+        else if (!_dropped && !_circling && u >= 1f)
             Destroy(gameObject);
     }
 
@@ -302,7 +358,8 @@ public class HouseBombBird : MonoBehaviour, IDamageable
             if (hit.collider != null
                 && hit.collider.GetComponentInParent<HouseBombBird>() == null
                 && hit.collider.GetComponentInParent<HouseBombEgg>() == null
-                && hit.collider.GetComponentInParent<BoatPiece>() == null)
+                && hit.collider.GetComponentInParent<BoatPiece>() == null
+                && hit.collider.GetComponentInParent<BoatWater>() == null)
                 y = Mathf.Max(y, hit.point.y + 4.6f);
         }
         return y;
@@ -314,24 +371,94 @@ public class HouseBombBird : MonoBehaviour, IDamageable
         return x * x * (3f - 2f * x);
     }
 
-    void DropEggs()
+    Vector3 AimPoint(out Vector3 vel)
     {
-        _dropped = true;
-        _dropAt = _t;
-        _dropPos = _pos;
-        Vector3 house = HouseBuildMode.Current != null ? HouseBuildMode.Current.HoldOrigin : _house;
+        vel = Vector3.zero;
+        if (_trackCraft)
+        {
+            BoatPiece craft = BoatRaceMode.Current != null ? BoatRaceMode.Current.PlayerCraft : null;
+            if (craft == null)
+            {
+                var move = Object.FindFirstObjectByType<HorrorFirstPersonController>();
+                if (move != null)
+                    craft = move.HullUnderFeet();
+            }
+            if (craft != null)
+            {
+                var lead = craft.IslandLeader() ?? craft;
+                var rb = lead.IslandRootBody() ?? lead.Body;
+                if (rb != null)
+                    vel = rb.linearVelocity;
+                Vector3 at = lead.transform.position;
+                if (rb != null)
+                    at = rb.worldCenterOfMass;
+                if (BoatWater.TryHeight(at, out float wy))
+                    at.y = Mathf.Max(at.y, wy + 0.28f);
+                return at;
+            }
+        }
+        if (HouseBuildMode.Current != null)
+            return HouseBuildMode.Current.HoldOrigin;
+        return _house;
+    }
+
+    void DropOne()
+    {
+        if (_eggsLeft <= 0)
+        {
+            BeginDepart();
+            return;
+        }
+        _eggsLeft--;
+        _dropsDone++;
+        if (_col != null)
+            _col.isTrigger = true;
+        if (_rb != null)
+        {
+            _rb.isKinematic = true;
+            _rb.useGravity = false;
+        }
+        Vector3 aim = AimPoint(out Vector3 aimVel);
         Vector3 right = Vector3.Cross(Vector3.up, _passDir);
         if (right.sqrMagnitude < 0.01f)
             right = Vector3.right;
         right.Normalize();
-        int n = Mathf.Clamp(_dropN, 1, 4);
-        for (int i = 0; i < n; i++)
-        {
-            float t = n == 1 ? 0f : (i / (float)(n - 1) - 0.5f);
-            Vector3 at = new Vector3(house.x, _pos.y - 0.35f, house.z) + right * (t * 1.15f) + _passDir * Random.Range(-0.35f, 0.35f);
-            Vector3 vel = Vector3.down * Random.Range(3.8f, 5.2f) + right * t * 0.35f;
-            HouseBombEgg.Spawn(at, vel, this);
-        }
+        float g = Physics.gravity.y;
+        Vector3 from = _pos + Vector3.down * 0.4f;
+        float flight = 0.62f;
+        Vector3 target = aim + aimVel * flight;
+        float jitter = _trackCraft ? 0.22f : 0.4f;
+        target += right * Random.Range(-jitter, jitter);
+        if (BoatWater.TryHeight(target, out float wy))
+            target.y = Mathf.Max(target.y, wy + 0.22f);
+        Vector3 v = (target - from) / flight;
+        v.y = (target.y - from.y) / flight - 0.5f * g * flight;
+        HouseBombEgg.Spawn(from, v, this);
+
+        bool leave = _eggsLeft <= 0 || Random.value < Mathf.Lerp(0.34f, 0.7f, (_dropsDone - 1) / 3f);
+        if (leave)
+            BeginDepart();
+        else
+            BeginCircle(aim);
+    }
+
+    void BeginCircle(Vector3 aim)
+    {
+        _circling = true;
+        _dropped = false;
+        Vector3 d = _pos - aim;
+        d.y = 0f;
+        _orbitAng = d.sqrMagnitude > 0.04f ? Mathf.Atan2(d.x, d.z) : 0f;
+        _circleLeft = Random.Range(1.45f, 2.7f);
+    }
+
+    void BeginDepart()
+    {
+        _circling = false;
+        _dropped = true;
+        _dropAt = _t;
+        _dropPos = _pos;
+        _eggsLeft = 0;
     }
 
     public void TakeDamage(float amount, Vector3 hitPoint, Vector3 hitDirection)
@@ -460,12 +587,14 @@ public class HouseBombEgg : MonoBehaviour, IDamageable
         HouseEggBlast.Play(at);
         if (HouseBuildMode.Current != null && HouseBuildMode.Holding)
             HouseBuildMode.Current.BlastHouse(at, 0.82f);
+        else if (BoatRaceMode.Current != null && BoatRaceMode.Current.CurrentPhase == BoatRaceMode.Phase.Race)
+            BoatRaceMode.Current.BlastCraft(at, 0.82f);
 
-        if (_owner != null && !_owner.IsDead)
+        if (_playerShot && _owner != null && !_owner.IsDead)
         {
             var bird = _owner;
             bird.TakeDamage(80f, at, (bird.transform.position - at).normalized);
-            if (_playerShot && bird.IsDead)
+            if (bird.IsDead)
             {
                 var actor = RaceRoster.Local();
                 RaceSim.AnnounceKill(actor != null ? actor.Id : (ushort)0, bird, "Pistol");
@@ -493,6 +622,21 @@ public static class HouseEggBlast
 {
     public static void Play(Vector3 pos)
     {
+        var fx = LoadExplosion();
+        if (fx != null)
+        {
+            var go = Object.Instantiate(fx, pos, Quaternion.identity);
+            go.name = "EggBlast";
+            var parts = go.GetComponentsInChildren<ParticleSystem>(true);
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (parts[i] != null)
+                    parts[i].Play(true);
+            }
+            Object.Destroy(go, 6f);
+            return;
+        }
+
         var root = new GameObject("EggBlast");
         root.transform.position = pos;
         Object.Destroy(root, 4.2f);
@@ -516,6 +660,18 @@ public static class HouseEggBlast
         Sparks(root.transform);
         Debris(root.transform);
         Shock(root.transform);
+    }
+
+    static GameObject LoadExplosion()
+    {
+        var loaded = Resources.Load<GameObject>("WFX_Explosion Simple");
+        if (loaded != null)
+            return loaded;
+#if UNITY_EDITOR
+        return UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/MAIN/Bird/WFX_Explosion Simple.prefab");
+#else
+        return null;
+#endif
     }
 
     static void Burst(Transform parent, string name, float lifeMin, float lifeMax, float spdMin, float spdMax,

@@ -46,6 +46,8 @@ public class RaceMood : MonoBehaviour
     Quaternion _sunRot;
     Color _ambient;
     bool _litSaved;
+    Quaternion _sunRotLive;
+    bool _sunRotReady;
     ParticleSystem _precip;
     bool _precipSnow;
     Color _waterDeep = new Color(0.15f, 0.21f, 0.34f, 0.96f);
@@ -134,6 +136,7 @@ public class RaceMood : MonoBehaviour
         _fogColLive = _from.fogColor;
         _rainLive = _from.rain;
         _snowLive = _from.snow;
+        _sunRotReady = false;
         ApplyLook(_from, true);
         QueueHold();
         _to = NextLook();
@@ -408,9 +411,9 @@ public class RaceMood : MonoBehaviour
         }
         FogDensity = _fogLive;
         FogColor = _fogColLive;
-        float k = force ? 1f : 1f - Mathf.Exp(-dt * 0.38f);
-        _waterDeep = Color.Lerp(_waterDeep, look.waterDeep, k);
-        _waterShallow = Color.Lerp(_waterShallow, look.waterShallow, k);
+        float waterK = force ? 1f : 1f - Mathf.Exp(-dt * 0.38f);
+        _waterDeep = Color.Lerp(_waterDeep, look.waterDeep, waterK);
+        _waterShallow = Color.Lerp(_waterShallow, look.waterShallow, waterK);
         BoatCurrentPath.SetRoundSpeed(look.current);
         ApplySun(look.sunCol, look.sunMul, look.sunEuler, force);
         float now = Time.unscaledTime;
@@ -499,14 +502,27 @@ public class RaceMood : MonoBehaviour
             return;
         Quaternion want = Quaternion.Euler(euler);
         float wantInt = Mathf.Clamp(_sunInt * mul, 0.25f, 2.4f);
-        float k = force ? 1f : 1f - Mathf.Exp(-Time.unscaledDeltaTime * 0.42f);
-        _sun.color = Color.Lerp(_sun.color, col, k);
-        _sun.intensity = Mathf.Lerp(_sun.intensity, wantInt, k);
-        _sun.transform.rotation = Quaternion.Slerp(_sun.transform.rotation, want, k);
+        float dt = Time.unscaledDeltaTime;
+        if (!_sunRotReady || force)
+        {
+            _sunRotLive = want;
+            _sunRotReady = true;
+            _sun.color = col;
+            _sun.intensity = wantInt;
+            _sun.transform.rotation = want;
+        }
+        else
+        {
+            float k = 1f - Mathf.Exp(-dt * 0.12f);
+            _sun.color = Color.Lerp(_sun.color, col, k);
+            _sun.intensity = Mathf.Lerp(_sun.intensity, wantInt, k);
+            _sunRotLive = Quaternion.RotateTowards(_sunRotLive, want, 1.6f * dt);
+            _sun.transform.rotation = _sunRotLive;
+        }
         RenderSettings.ambientLight = Color.Lerp(
             RenderSettings.ambientLight,
-            Color.Lerp(_ambient, col, 0.18f) * Mathf.Lerp(0.7f, 1.05f, mul),
-            k);
+            Color.Lerp(_ambient, _sun.color, 0.18f) * Mathf.Lerp(0.7f, 1.05f, mul),
+            1f - Mathf.Exp(-dt * 0.12f));
     }
 
     void ApplyGrade(float exposure, float contrast, float sat, float temp, float tint, bool force)

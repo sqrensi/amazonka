@@ -70,6 +70,7 @@ public class BoatRaceMode : MonoBehaviour
     float _spawnProtectUntil;
 
     public Phase CurrentPhase => _phase;
+    public BoatPiece PlayerCraft => _craft;
     public bool HandsLocked => _closing || _ended || _phase == Phase.Launch || _phase == Phase.Results || _phase == Phase.Intro;
     public Transform Finish => finish;
     public Transform WaterLaunch => waterLaunch;
@@ -299,6 +300,23 @@ public class BoatRaceMode : MonoBehaviour
             _actor.Craft = _craft;
         if (_sharks != null)
             _sharks.Arm(RaceSim.RoundSeed);
+        StartCoroutine(BirdRaids());
+    }
+
+    IEnumerator BirdRaids()
+    {
+        yield return new WaitForSeconds(11f);
+        while (_phase == Phase.Race && !_closing && !_ended)
+        {
+            FollowPlayerCraft();
+            if (_craft != null)
+            {
+                HouseBombBird.SpawnOnBoat(_craft);
+                if (_hud != null)
+                    _hud.FlashWarn("BIRD", "Eggs inbound.");
+            }
+            yield return new WaitForSeconds(Random.Range(18f, 28f));
+        }
     }
 
     void TickRace()
@@ -514,6 +532,37 @@ public class BoatRaceMode : MonoBehaviour
         var lead = hull.IslandLeader() ?? hull;
         if (lead != null)
             _craft = lead;
+    }
+
+    public void BlastCraft(Vector3 at, float power)
+    {
+        if (_phase != Phase.Race || _craft == null || _closing || _ended)
+            return;
+        power = Mathf.Clamp01(power);
+        var lead = _craft.IslandLeader() ?? _craft;
+        lead.HullFlood = Mathf.Clamp01(lead.HullFlood + 0.045f + power * 0.07f);
+        var buf = new List<BoatPiece>(24);
+        lead.CollectIsland(buf);
+        for (int i = 0; i < buf.Count; i++)
+        {
+            var p = buf[i];
+            if (p == null)
+                continue;
+            p.WakeForWater();
+            var rb = p.IslandRootBody() ?? p.Body;
+            if (rb == null || rb.isKinematic)
+                continue;
+            Vector3 d = rb.worldCenterOfMass - at;
+            float dist = Mathf.Max(0.35f, d.magnitude);
+            if (dist > 6.5f)
+                continue;
+            float fall = 1f - dist / 6.5f;
+            rb.WakeUp();
+            rb.AddForce(d.normalized * (2.4f * fall * power) + Vector3.up * (1.15f * fall * power), ForceMode.VelocityChange);
+            rb.AddTorque(Random.insideUnitSphere * (1.4f * fall * power), ForceMode.VelocityChange);
+        }
+        if (_hud != null)
+            _hud.PulseHurt(0.1f + power * 0.08f);
     }
 
     bool OnBoat()

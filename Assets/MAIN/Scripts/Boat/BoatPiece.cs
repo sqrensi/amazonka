@@ -106,6 +106,8 @@ public class BoatPiece : MonoBehaviour, IInteractable
 
     public static BoatPiece IslandLeaderFrom(List<BoatPiece> island)
     {
+        BoatPiece rooted = null;
+        int rootedKids = -1;
         BoatPiece lead = null;
         int best = int.MaxValue;
         BoatPiece oar = null;
@@ -130,7 +132,23 @@ public class BoatPiece : MonoBehaviour, IInteractable
                 best = id;
                 lead = p;
             }
+            if (p.IsWeldSlave || p.Body == null)
+                continue;
+            int kids = 0;
+            for (int k = 0; k < island.Count; k++)
+            {
+                var q = island[k];
+                if (q != null && q != p && q.IsWeldSlave && q.transform.parent == p.transform)
+                    kids++;
+            }
+            if (kids > rootedKids)
+            {
+                rootedKids = kids;
+                rooted = p;
+            }
         }
+        if (rooted != null && rootedKids > 0)
+            return rooted;
         return lead != null ? lead : (oar != null ? oar : island[0]);
     }
 
@@ -975,12 +993,10 @@ public class BoatPiece : MonoBehaviour, IInteractable
     {
         if (_rb == null)
             return;
-        _rb.mass = Mathf.Max(0.4f, mass);
-        _rb.automaticCenterOfMass = true;
-        _rb.automaticInertiaTensor = true;
-        _rb.ResetInertiaTensor();
-        _rb.angularDamping = 4.2f;
-        _rb.linearDamping = 0.22f;
+        mass = Mathf.Max(0.4f, mass);
+        if (Mathf.Abs(_rb.mass - mass) < 0.5f)
+            return;
+        _rb.mass = mass;
     }
 
     public void BreakNailJoints()
@@ -1456,6 +1472,15 @@ public class BoatPiece : MonoBehaviour, IInteractable
             if (p == null)
                 continue;
             into.Add(p);
+            var par = p.transform.parent != null ? p.transform.parent.GetComponent<BoatPiece>() : null;
+            if (par != null)
+                TryAddIsland(par);
+            for (int c = 0; c < p.transform.childCount; c++)
+            {
+                var child = p.transform.GetChild(c).GetComponent<BoatPiece>();
+                if (child != null)
+                    TryAddIsland(child);
+            }
             for (int i = 0; i < p._nails.Count; i++)
             {
                 BoatNail n = p._nails[i];

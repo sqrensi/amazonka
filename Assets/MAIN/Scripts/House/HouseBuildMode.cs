@@ -52,6 +52,7 @@ public class HouseBuildMode : MonoBehaviour
     readonly List<HouseRockSpawner> _rockSpawners = new List<HouseRockSpawner>(6);
     float _rockUntil;
     float _outsideSince = -1f;
+    bool _hadRoof;
 
     public bool InHold => _phase == Phase.Hold && !_ended && !_closing;
     public static bool Holding => Current != null && Current.InHold;
@@ -98,6 +99,7 @@ public class HouseBuildMode : MonoBehaviour
         Quaking = false;
         MoveScale = 1f;
         _outsideSince = -1f;
+        _hadRoof = false;
         _phase = Phase.Intro;
         _endsAt = Time.unscaledTime + 10000f;
         _quakeAt.Clear();
@@ -243,6 +245,13 @@ public class HouseBuildMode : MonoBehaviour
         KeepPlayerInHouse();
         MaybeQuake();
         RefreshHp();
+        if (HouseHasRoof())
+            _hadRoof = true;
+        else if (_hadRoof)
+        {
+            Fail("The roof collapsed");
+            return;
+        }
         int pct = Mathf.RoundToInt(_hp * 100f);
         bool inside = PlayerInHouse();
         string feel = Time.unscaledTime < _rockUntil
@@ -760,24 +769,43 @@ public class HouseBuildMode : MonoBehaviour
                 if (_buf[i] != null)
                     keepSet.Add(_buf[i]);
             }
+            var frozen = new List<BoatPiece>(keepSet);
+            for (int i = 0; i < frozen.Length; i++)
+            {
+                var p = frozen[i];
+                if (p == null)
+                    continue;
+                var parts = p.GetComponentsInChildren<BoatPiece>(true);
+                for (int k = 0; k < parts.Length; k++)
+                {
+                    if (parts[k] != null)
+                        keepSet.Add(parts[k]);
+                }
+                var root = p.GetComponentInParent<BoatPiece>();
+                if (root != null)
+                    keepSet.Add(root);
+            }
         }
 
         var allPieces = Object.FindObjectsByType<BoatPiece>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < allPieces.Length; i++)
+        if (keep == null)
         {
-            var p = allPieces[i];
-            if (p == null || keepSet.Contains(p))
-                continue;
-            if (Owned(p.transform))
-                continue;
-            p.CollectIsland(_buf);
-            bool fastened = CountParts(_buf) >= 2 || p.HasAnyNail();
-            if (!fastened)
-                continue;
-            for (int k = 0; k < _buf.Count; k++)
+            for (int i = 0; i < allPieces.Length; i++)
             {
-                if (_buf[k] != null)
-                    keepSet.Add(_buf[k]);
+                var p = allPieces[i];
+                if (p == null || keepSet.Contains(p))
+                    continue;
+                if (Owned(p.transform))
+                    continue;
+                p.CollectIsland(_buf);
+                bool fastened = CountParts(_buf) >= 2 || p.HasAnyNail();
+                if (!fastened)
+                    continue;
+                for (int k = 0; k < _buf.Count; k++)
+                {
+                    if (_buf[k] != null)
+                        keepSet.Add(_buf[k]);
+                }
             }
         }
 
@@ -792,6 +820,9 @@ public class HouseBuildMode : MonoBehaviour
             if (p == null || keepSet.Contains(p))
                 continue;
             if (Owned(p.transform))
+                continue;
+            var hosted = p.GetComponentInParent<BoatPiece>();
+            if (hosted != null && keepSet.Contains(hosted))
                 continue;
             if (boat != null && boat.IsLootSource(p.gameObject))
                 continue;
@@ -808,7 +839,7 @@ public class HouseBuildMode : MonoBehaviour
                 continue;
             if (Owned(item.transform))
                 continue;
-            var piece = item.GetComponent<BoatPiece>();
+            var piece = item.GetComponent<BoatPiece>() ?? item.GetComponentInParent<BoatPiece>();
             if (piece != null && keepSet.Contains(piece))
                 continue;
             if (boat != null && boat.IsLootSource(item.gameObject))
@@ -955,31 +986,109 @@ public class HouseBuildMode : MonoBehaviour
     {
         if (_player == null || _house == null)
             return false;
-        if (_player.IsOnCraft)
-            return true;
         _house.CollectIsland(_buf);
-        Bounds b = new Bounds(_house.transform.position, Vector3.one * 0.4f);
+        if (!InsideFootprint(_player.transform.position))
+            return false;
+        return HasCoverOver(_player.transform.position);
+    }
+
+    bool InsideFootprint(Vector3 feet)
+    {
+        Bounds b = default;
         bool any = false;
         for (int i = 0; i < _buf.Count; i++)
         {
             var p = _buf[i];
-            if (p == null)
+            if (p == null || p.Kind == BoatPieceKind.Oar)
                 continue;
-            if (p.TrySolidBounds(out Bounds pb))
+            if (!p.TrySolidBounds(out Bounds pb))
+                continue;
+            if (!any)
             {
-                if (!any)
-                {
-                    b = pb;
-                    any = true;
-                }
-                else
-                    b.Encapsulate(pb);
+                b = pb;
+                any = true;
             }
+            else
+                b.Encapsulate(pb);
         }
         if (!any)
             return false;
-        b.Expand(new Vector3(1.35f, 1.8f, 1.35f));
-        return b.Contains(_player.transform.position);
+        b.Expand(new Vector3(1.15f, 0f, 1.15f));
+        return feet.x >= b.min.x && feet.x <= b.max.x && feet.z >= b.min.z && feet.z <= b.max.z;
+    }
+
+    bool HouseHasRoof()
+    {
+        if (_house == null)
+            return false;
+        _house.CollectIsland(_buf);
+        float floor = float.PositiveInfinity;
+        for (int i = 0; i < _buf.Count; i++)
+        {
+            var p = _buf[i];
+            if (p == null || p.Kind == BoatPieceKind.Oar || !p.TrySolidBounds(out Bounds pb))
+                continue;
+            floor = Mathf.Min(floor, pb.min.y);
+        }
+        if (float.IsInfinity(floor))
+            return false;
+        for (int i = 0; i < _buf.Count; i++)
+        {
+            var p = _buf[i];
+            if (p == null || p.Kind == BoatPieceKind.Oar || !p.TrySolidBounds(out Bounds pb))
+                continue;
+            if (IsRoofPiece(pb, floor))
+                return true;
+        }
+        return false;
+    }
+
+    static bool IsRoofPiece(Bounds pb, float floor)
+    {
+        if (pb.max.y < floor + 1.35f)
+            return false;
+        float span = Mathf.Max(pb.size.x, pb.size.z);
+        if (span < 0.28f)
+            return false;
+        return pb.min.y >= floor + 0.85f || pb.size.y < 0.7f;
+    }
+
+    bool HasCoverOver(Vector3 feet)
+    {
+        if (_house == null)
+            return false;
+        if (_buf.Count == 0)
+            _house.CollectIsland(_buf);
+        float need = feet.y + 1.05f;
+        for (int i = 0; i < _buf.Count; i++)
+        {
+            var p = _buf[i];
+            if (p == null || p.Kind == BoatPieceKind.Oar || !p.TrySolidBounds(out Bounds pb))
+                continue;
+            if (pb.max.y < need)
+                continue;
+            if (feet.x < pb.min.x - 0.55f || feet.x > pb.max.x + 0.55f)
+                continue;
+            if (feet.z < pb.min.z - 0.55f || feet.z > pb.max.z + 0.55f)
+                continue;
+            return true;
+        }
+        Vector3 origin = feet + Vector3.up * 1.55f;
+        var hits = Physics.RaycastAll(origin, Vector3.up, 4.8f, ~0, QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < hits.Length; i++)
+        {
+            var col = hits[i].collider;
+            if (col == null)
+                continue;
+            if (col.GetComponentInParent<HorrorFirstPersonController>() != null)
+                continue;
+            var piece = BoatPart.FromCollider(col);
+            if (piece == null || !piece.SharesIslandWith(_house))
+                continue;
+            if (hits[i].point.y >= need)
+                return true;
+        }
+        return false;
     }
 
     bool FailIfOutsideTooLong()
@@ -1437,6 +1546,9 @@ public class HouseQuakeCam : MonoBehaviour
     Vector3 _posVel;
     Vector3 _tilt;
     Vector3 _tiltVel;
+    float _jolt;
+    Vector3 _joltDir = Vector3.up;
+    float _nextJolt;
 
     public void Play()
     {
@@ -1459,6 +1571,7 @@ public class HouseQuakeCam : MonoBehaviour
         _posVel = Vector3.zero;
         _tilt = Vector3.zero;
         _tiltVel = Vector3.zero;
+        _jolt = 0f;
         enabled = false;
     }
 
@@ -1466,20 +1579,31 @@ public class HouseQuakeCam : MonoBehaviour
     {
         if (!_on || _level < 0.001f)
             return;
-        Vector3 acc = HouseQuakeGround.Acc;
-        float env = Mathf.Max(_level, HouseQuakeGround.Envelope);
+        float dt = Time.unscaledDeltaTime;
         float t = Time.unscaledTime;
-        Vector3 rumble = new Vector3(
-            Mathf.Sin(t * 6.3f),
-            Mathf.Sin(t * 7.4f + 0.7f),
-            Mathf.Sin(t * 5.2f + 1.1f)) * (env * 0.014f);
-        Vector3 wantPos = new Vector3(-acc.x, -acc.y * 0.45f, -acc.z) * (0.011f * _level) + rumble;
-        _pos = Vector3.SmoothDamp(_pos, wantPos, ref _posVel, 0.16f, 8f, Time.deltaTime);
+        float e = Mathf.Clamp(_level, 0f, 1.35f);
+        if (t >= _nextJolt)
+        {
+            _jolt = Random.Range(0.55f, 1f) * e;
+            _joltDir = new Vector3(Random.Range(-1f, 1f), Random.Range(-0.35f, 0.85f), Random.Range(-1f, 1f)).normalized;
+            _nextJolt = t + Random.Range(0.55f, 1.45f) / Mathf.Max(0.35f, e);
+        }
+        _jolt = Mathf.MoveTowards(_jolt, 0f, dt * (1.8f + e * 1.4f));
+
+        float sway = Mathf.Sin(t * 1.05f) * 0.55f + Mathf.Sin(t * 0.31f + 1.7f) * 0.35f;
+        float heave = Mathf.Sin(t * 2.35f) * 0.4f + Mathf.Sin(t * 6.8f) * 0.12f;
+        float tremor = (Mathf.PerlinNoise(t * 11.5f, 0.4f) - 0.5f);
+        float tremorZ = (Mathf.PerlinNoise(1.8f, t * 13.2f) - 0.5f);
+        Vector3 wantPos = new Vector3(
+            sway * 0.018f * e + tremor * 0.006f * e + _joltDir.x * _jolt * 0.028f,
+            heave * 0.022f * e + _joltDir.y * _jolt * 0.04f,
+            tremorZ * 0.01f * e + _joltDir.z * _jolt * 0.02f);
+        _pos = Vector3.SmoothDamp(_pos, wantPos, ref _posVel, 0.045f, 12f, dt);
         Vector3 wantTilt = new Vector3(
-            Mathf.Clamp(-acc.z * 0.18f * _level, -2.4f, 2.4f),
-            Mathf.Clamp(acc.x * 0.06f * _level, -1.1f, 1.1f),
-            Mathf.Clamp(acc.x * 0.28f * _level, -3.2f, 3.2f));
-        _tilt = Vector3.SmoothDamp(_tilt, wantTilt, ref _tiltVel, 0.2f, 18f, Time.deltaTime);
+            heave * 1.35f * e + _joltDir.z * _jolt * 2.8f,
+            tremor * 0.45f * e,
+            sway * 2.4f * e + _joltDir.x * _jolt * 3.4f);
+        _tilt = Vector3.SmoothDamp(_tilt, wantTilt, ref _tiltVel, 0.07f, 28f, dt);
         transform.localPosition += _pos;
         transform.localRotation *= Quaternion.Euler(_tilt);
     }

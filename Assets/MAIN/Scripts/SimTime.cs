@@ -22,6 +22,8 @@ public static class SimTime
 
     public static float VisualAlpha()
     {
+        if (Time.timeScale < 0.5f)
+            return 1f;
         float step = Time.fixedDeltaTime;
         if (step < 0.00001f)
             return 1f;

@@ -288,8 +288,11 @@ public class HorrorFirstPersonController : MonoBehaviour
         else
             DrawPhysInterp();
         UpdateLook();
-        UpdateStanceView(Time.deltaTime);
-        UpdateCameraMotion(Time.deltaTime);
+        float camDt = MovementLocked || Time.timeScale < 0.55f
+            ? Time.unscaledDeltaTime
+            : Time.deltaTime;
+        UpdateStanceView(camDt);
+        UpdateCameraMotion(camDt);
     }
 
     void LateUpdate()
@@ -1483,11 +1486,12 @@ public class HorrorFirstPersonController : MonoBehaviour
     {
         if (_rideBoat == null)
             return;
-        Vector3 local = Vector3.Lerp(_rideLocalPrev, _rideLocal, SimTime.VisualAlpha());
+        float u = Time.timeScale < 0.5f || MovementLocked ? 1f : SimTime.VisualAlpha();
+        Vector3 local = Vector3.Lerp(_rideLocalPrev, _rideLocal, u);
         Vector3 p = _rideBoat.transform.TransformPoint(local);
         if (_jumpedThisAir)
         {
-            float lift = Mathf.Lerp(_jumpLiftPrev, _jumpLift, SimTime.VisualAlpha());
+            float lift = Mathf.Lerp(_jumpLiftPrev, _jumpLift, u);
             p.y += Mathf.Max(0f, lift);
         }
         transform.position = p;
@@ -1542,6 +1546,22 @@ public class HorrorFirstPersonController : MonoBehaviour
     {
         if (cameraPivot == null || playerCamera == null)
             return;
+
+        Transform cam = playerCamera.transform;
+        dt = Mathf.Max(dt, 0.0001f);
+        if (MovementLocked || Time.timeScale < 0.55f)
+        {
+            _bobWeight = Mathf.Lerp(_bobWeight, 0f, 1f - Mathf.Exp(-12f * dt));
+            _lean = Mathf.Lerp(_lean, 0f, 1f - Mathf.Exp(-10f * dt));
+            _leanVel = 0f;
+            _accelTilt = Mathf.Lerp(_accelTilt, 0f, 1f - Mathf.Exp(-10f * dt));
+            _accelTiltVel = 0f;
+            _camRoll = Mathf.Lerp(_camRoll, 0f, 1f - Mathf.Exp(-10f * dt));
+            _lagPitch = Mathf.Lerp(_lagPitch, 0f, 1f - Mathf.Exp(-10f * dt));
+            _lagYaw = Mathf.Lerp(_lagYaw, 0f, 1f - Mathf.Exp(-10f * dt));
+            cam.localRotation = Quaternion.Euler(_lagPitch, _lagYaw, _camRoll);
+            return;
+        }
 
         float planarSpeed = new Vector2(_controller.velocity.x, _controller.velocity.z).magnitude;
         bool moving = _wasGrounded && planarSpeed > 0.12f;
@@ -1610,7 +1630,6 @@ public class HorrorFirstPersonController : MonoBehaviour
         if (IsSprinting && _wasGrounded)
             sprintShake = (Mathf.PerlinNoise(Time.time * 14f, 2.4f) - 0.5f) * 0.006f;
 
-        Transform cam = playerCamera.transform;
         Vector3 targetPos = new Vector3(
             bobX + breathX + micro,
             bobY + breath + _landOffset + _stepPunch + sprintShake,
@@ -1628,7 +1647,9 @@ public class HorrorFirstPersonController : MonoBehaviour
         float leanTarget = Mathf.Clamp(-LocalPlanarVelocity.x / Mathf.Max(0.1f, sprintSpeed) * strafeLean, -strafeLean, strafeLean);
         _lean = Mathf.SmoothDamp(_lean, leanTarget, ref _leanVel, 0.14f, 30f, dt);
 
-        float accel = (planarSpeed - _prevPlanarSpeed) / Mathf.Max(dt, 0.0001f);
+        float accel = (planarSpeed - _prevPlanarSpeed) / dt;
+        if (IsOnCraft)
+            accel = 0f;
         _prevPlanarSpeed = planarSpeed;
         float accelTarget = Mathf.Clamp(-accel * 0.035f * accelPitch, -accelPitch, accelPitch);
         if (!_wasGrounded && !IsSwimming)

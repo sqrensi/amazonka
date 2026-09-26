@@ -156,14 +156,15 @@ public class BoatNail : MonoBehaviour, IInteractable
         DisconnectJointKeepState();
         Rigidbody ra = A.IslandRootBody() ?? A.Body;
         Rigidbody rb = B.IslandRootBody() ?? B.Body;
-        if (ra == null || rb == null || ra == rb)
+        BoatBuildUtil.StopMotion(ra);
+        BoatBuildUtil.StopMotion(rb);
+        if (ra != null && rb != null && ra == rb)
             return;
-        _joint = ra.gameObject.AddComponent<FixedJoint>();
-        _joint.connectedBody = rb;
-        _joint.breakForce = Mathf.Infinity;
-        _joint.breakTorque = Mathf.Infinity;
-        _joint.enableCollision = false;
-        _joint.enablePreprocessing = true;
+        if (ra != null)
+            ra.maxDepenetrationVelocity = 0.08f;
+        if (rb != null)
+            rb.maxDepenetrationVelocity = 0.08f;
+        BoatIsland.Refresh(A);
     }
 
     public void Drive()
@@ -174,27 +175,8 @@ public class BoatNail : MonoBehaviour, IInteractable
         Driven = true;
         BoatLayers.BindPickup(this, false);
         Hide();
-
-        Rigidbody ra = A.IslandRootBody() ?? A.Body;
-        Rigidbody rb = B.IslandRootBody() ?? B.Body;
-        if (ra != null && ra == rb)
-            return;
-
-        if (A.SharesIslandWith(B) && A.IsLockedInBoat() && B.IsLockedInBoat())
-            return;
-
-        if (_joint != null)
-        {
-            Object.DestroyImmediate(_joint);
-            _joint = null;
-        }
-
-        bool bothLocked = A.IsLockedInBoat() && B.IsLockedInBoat();
-        if (!bothLocked)
-            BoatBuildUtil.SnapTogether(A, B, Aim);
-        BoatBuildUtil.StopMotion(A.Body);
-        BoatBuildUtil.StopMotion(B.Body);
-        BoatIsland.Refresh(A);
+        BoatBuildUtil.StopMotion(A.IslandRootBody() ?? A.Body);
+        BoatBuildUtil.StopMotion(B.IslandRootBody() ?? B.Body);
     }
 
     public void RebuildJoint()
